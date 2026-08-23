@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Caveat:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-cream: #F7F3EC;
+  --color-warm-white: #FFFDF8;
+  --color-sage: #A8B8A0;
+  --color-sage-light: #C8D8C0;
+  --color-sage-dark: #7A9872;
+  --color-rose: #D8A7A7;
+  --color-rose-light: #EDD4D4;
+  --color-rose-dark: #B88080;
+  --color-lavender: #B7A7D8;
+  --color-lavender-light: #D4C8EE;
+  --color-terracotta: #C97B63;
+  --color-terracotta-dark: #A86248;
+  --color-brown: #8B6B5C;
+  --color-brown-dark: #5C3D2E;
+  --color-ink: #2E1D15;
+  --color-ink-muted: #7A6058;
+
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-hand: 'Caveat', cursive;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background-color: #FFFDF8;
+  color: #2E1D15;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #F7F3EC; }
+::-webkit-scrollbar-thumb { background: #D8A7A7; border-radius: 10px; }
+
+.font-display { font-family: 'Playfair Display', Georgia, serif; }
+.font-hand { font-family: 'Caveat', cursive; }
