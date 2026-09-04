@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react'
-import type { Navigate } from '../types'
-import { YarnBall, CrochetFlower } from '../components/YarnDecor'
+﻿import { useState, useRef } from 'react'
+import type { Navigate } from "@/types"
+import { YarnBall, CrochetFlower } from "../YarnDecor"
 
 const colorOptions = ['Dusty Rose', 'Cream', 'Sage Green', 'Lavender', 'Terracotta', 'Warm Brown', 'Sunflower Yellow', 'White', 'Blush Pink', 'Natural Cream']
 const categoryOptions = ['Scrunchies', 'Keychains', 'Charms', 'Bookmarks', 'Bags', 'Home']
-const processingOptions = ['3–5 working days', '5–7 working days', '7–10 working days']
+const processingOptions = ['3â€“5 working days', '5â€“7 working days', '7â€“10 working days']
 
 export default function AddProductPage({ navigate }: { navigate: Navigate }) {
   const [dragOver, setDragOver] = useState(false)
@@ -15,7 +15,7 @@ export default function AddProductPage({ navigate }: { navigate: Navigate }) {
     description: '',
     price: '',
     category: '',
-    processingTime: '3–5 working days',
+    processingTime: '3â€“5 working days',
     active: true,
     featured: false,
   })
@@ -78,7 +78,7 @@ export default function AddProductPage({ navigate }: { navigate: Navigate }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
           <div>
             <h1 style={{ fontFamily: 'Playfair Display, Georgia, serif', fontSize: '1.75rem', fontWeight: 700, color: '#2E1D15' }}>Add New Product</h1>
-            <p style={{ color: '#7A6058', fontSize: '0.85rem', marginTop: 4 }}>Fill in the details below — you can publish in under 2 minutes.</p>
+            <p style={{ color: '#7A6058', fontSize: '0.85rem', marginTop: 4 }}>Fill in the details below â€” you can publish in under 2 minutes.</p>
           </div>
           <button onClick={handlePublish} style={{ backgroundColor: '#C97B63', color: '#FFFDF8', fontWeight: 600, padding: '0.7rem 2rem', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: '0.95rem', boxShadow: '0 4px 16px rgba(201,123,99,0.3)' }}>
             Publish Product
@@ -105,7 +105,7 @@ export default function AddProductPage({ navigate }: { navigate: Navigate }) {
                 </svg>
               </div>
               <p style={{ fontWeight: 600, color: '#2E1D15', fontSize: '0.9rem' }}>Drag & drop image here</p>
-              <p style={{ color: '#7A6058', fontSize: '0.78rem', marginTop: 4 }}>or click to browse · PNG, JPG, WEBP</p>
+              <p style={{ color: '#7A6058', fontSize: '0.78rem', marginTop: 4 }}>or click to browse Â· PNG, JPG, WEBP</p>
             </div>
 
             {/* Live preview */}
@@ -120,15 +120,15 @@ export default function AddProductPage({ navigate }: { navigate: Navigate }) {
                 </div>
                 <p style={{ fontFamily: 'Playfair Display, Georgia, serif', fontWeight: 600, fontSize: '1rem', color: '#2E1D15' }}>{form.name || 'Product Name'}</p>
                 <p style={{ color: '#7A6058', fontSize: '0.78rem', marginTop: 2 }}>{form.category || 'Category'}</p>
-                <p style={{ color: '#C97B63', fontWeight: 700, marginTop: 4 }}>{form.price ? `₹${form.price}` : '₹—'}</p>
+                <p style={{ color: '#C97B63', fontWeight: 700, marginTop: 4 }}>{form.price ? `â‚¹${form.price}` : 'â‚¹â€”'}</p>
               </div>
             </div>
 
             <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.85rem', backgroundColor: '#F7F3EC', borderRadius: 10, border: '1px solid #EDD4D4' }}>
               <p style={{ color: '#7A6058', fontSize: '0.72rem', lineHeight: 1.5 }}>
-                ✦ Images auto-crop to 4:5 ratio<br/>
-                ✦ Thumbnails auto-generate<br/>
-                ✦ Product cards stay aligned automatically
+                âœ¦ Images auto-crop to 4:5 ratio<br/>
+                âœ¦ Thumbnails auto-generate<br/>
+                âœ¦ Product cards stay aligned automatically
               </p>
             </div>
           </div>
@@ -157,7 +157,7 @@ export default function AddProductPage({ navigate }: { navigate: Navigate }) {
 
             <Field label="Full description">
               <textarea
-                placeholder="Describe the product in detail — materials, size, feel, use..."
+                placeholder="Describe the product in detail â€” materials, size, feel, use..."
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 rows={4}
@@ -166,7 +166,7 @@ export default function AddProductPage({ navigate }: { navigate: Navigate }) {
             </Field>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <Field label="Price (₹) *">
+              <Field label="Price (â‚¹) *">
                 <input
                   type="number"
                   placeholder="e.g. 120"
@@ -222,7 +222,7 @@ export default function AddProductPage({ navigate }: { navigate: Navigate }) {
             <button onClick={handlePublish} style={{ backgroundColor: '#C97B63', color: '#FFFDF8', fontWeight: 600, padding: '0.875rem', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: '0.95rem', boxShadow: '0 4px 16px rgba(201,123,99,0.25)', transition: 'background-color 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = '#A86248'}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = '#C97B63'}>
-              Publish Product →
+              Publish Product â†’
             </button>
           </div>
         </div>

@@ -1,186 +1,435 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react'
-import type { Page, Navigate, AuthUser, CartItem } from '../types'
-import Navbar from './Navbar'
-import Footer from './Footer'
-import LoginModal from './LoginModal'
-import HomePage from '../pages/HomePage'
-import CatalogPage from '../pages/CatalogPage'
-import ProductDetailPage from '../pages/ProductDetailPage'
-import CustomerDashboard from '../pages/CustomerDashboard'
-import AdminDashboard from '../pages/AdminDashboard'
-import AddProductPage from '../pages/AddProductPage'
-import PastCreationsPage from '../pages/PastCreationsPage'
-import PaymentPage from '../pages/PaymentPage'
-import { supabase } from '../lib/supabase'
-import AboutPage from '../pages/AboutPage'
-import CartPage from '../pages/CartPage'
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { Page, Navigate, AuthUser, CartItem } from "../types";
 
-import TestAPI from "./TestAPI";
+import Navbar from "./Navbar";
+import Footer from "./Footer";
+import LoginModal from "./LoginModal";
+import CustomOrderModal from "./CustomOrderModal";
 
-const ADMIN_PAGES: Page[] = ['admin', 'add-product', 'past-creations']
-const NO_FOOTER_PAGES: Page[] = ['admin', 'add-product', 'past-creations']
+import HomePage from "./screens/HomeScreen";
+import CatalogPage from "./screens/CatalogScreen";
+import ProductDetailPage from "./screens/ProductDetailScreen";
+import CustomerDashboard from "./screens/CustomerDashboardScreen";
+import AdminDashboard from "./screens/AdminDashboardScreen";
+import AddProductPage from "./screens/AddProductScreen";
+import PastCreationsPage from "./screens/PastCreationsScreen";
+import PaymentPage from "./screens/PaymentScreen";
+import AboutPage from "./screens/AboutScreen";
+import CartPage from "./screens/CartScreen";
+import AIAssistantPage from "./screens/AIAssistantScreen";
 
-export default function App() {
-  console.log("🔥 APP IS RUNNING")
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [page, setPage] = useState<Page>('home')
-  const [pageData, setPageData] = useState<Record<string, string>>({})
-  const [cart, setCart] = useState<CartItem[]>([])
+import { supabase } from "../lib/supabase";
 
-  // Login modal state
-  const [loginMode, setLoginMode] = useState<'toast' | 'modal' | null>(null)
-  const [scrollPromptDismissed, setScrollPromptDismissed] = useState(false)
+const ADMIN_EMAIL = "asmileis4evr@gmail.com";
 
-  // Login count (admin stat)
-  const [loginCount, setLoginCount] = useState(0)
-
-  useEffect(() => {
-  async function restoreSession() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (session?.user) {
-      console.log("🔐 Existing session found:", session.user.email)
-
-      const authUser: AuthUser = {
-        id: session.user.id,
-        email: session.user.email ?? '',
-        role: session.user.user_metadata?.role ?? 'customer',
-        name: session.user.user_metadata?.name ?? '',
-      }
-
-      setUser(authUser)
-    }
-  }
-
-  restoreSession()
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange(
-    (_event, session) => {
-      if (!session?.user) {
-        setUser(null)
-        return
-      }
-
-      const authUser: AuthUser = {
-        id: session.user.id,
-        email: session.user.email ?? '',
-        role: session.user.user_metadata?.role ?? 'customer',
-        name: session.user.user_metadata?.name ?? '',
-      }
-
-      setUser(authUser)
-    }
-  )
-
-  return () => {
-    subscription.unsubscribe()
-  }
-}, [])
-  // Scroll-triggered toast: show after 600px, once per session
-  useEffect(() => {
-    if (user || scrollPromptDismissed) return
-    function onScroll() {
-      if (window.scrollY > 600 && !scrollPromptDismissed && !user) {
-        setLoginMode('toast')
-      }
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [user, scrollPromptDismissed])
-
-  const navigate: Navigate = useCallback((target, data) => {
-    console.log("🚀 NAVIGATE CALLED:", target)
-    setPage(target)
-    if (data) setPageData(data)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
-
-  function handleLogin(authedUser: AuthUser) {
-    setUser(authedUser)
-    setLoginCount(c => c + 1)
-    setLoginMode(null)
-    setScrollPromptDismissed(true)
-    if (authedUser.role === 'admin') {
-      navigate('admin')
-    } else if (page === 'payment' || page === 'dashboard') {
-      // stay on current page
-    } else {
-      // stay on whatever page they were on
-    }
-  }
-
-  async function handleLogout() {
-  await supabase.auth.signOut()
-
-  setUser(null)
-  setCart([])
-  setPage('home')
-
-  window.scrollTo({ top: 0 })
+function isAdminUser(user: AuthUser | null): boolean {
+  return !!user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 }
 
+const ADMIN_PAGES: Page[] = [
+  "admin",
+  "add-product",
+  "past-creations",
+];
+
+const NO_FOOTER_PAGES: Page[] = [
+  "admin",
+  "add-product",
+  "past-creations",
+];
+
+export default function App() {
+  console.log("❤️‍🔥 APP IS RUNNING");
+
+  // ── Auth ─────────────────────────────────────────────────────────────────
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loginMode, setLoginMode] = useState<
+    "toast" | "modal" | null
+  >(null);
+  const [loginCount, setLoginCount] = useState(0);
+  const [loginToast, setLoginToast] = useState("");
+
+  // Controls whether the scroll login prompt can appear again
+  const [scrollPromptDismissed, setScrollPromptDismissed] =
+    useState(false);
+
+  // ── Routing ──────────────────────────────────────────────────────────────
+  const [page, setPage] = useState<Page>("home");
+  const [pageData, setPageData] = useState<Record<string, string>>({});
+
+  // ── Cart ─────────────────────────────────────────────────────────────────
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartLoaded, setCartLoaded] = useState(false);
+
+  // ── Custom Order ─────────────────────────────────────────────────────────
+  const [showCustomOrder, setShowCustomOrder] = useState(false);
+
+  // ── Restore Supabase session ─────────────────────────────────────────────
+  useEffect(() => {
+    async function restoreSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        console.log(
+          "🔐 Existing session found:",
+          session.user.email
+        );
+
+        const authUser: AuthUser = {
+          id: session.user.id,
+          email: session.user.email ?? "",
+          role:
+            session.user.user_metadata?.role ?? "customer",
+          name:
+            session.user.user_metadata?.name ?? "",
+        };
+
+        setUser(authUser);
+      }
+    }
+
+    restoreSession();
+
+    // Listen for login/logout/session changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (!session?.user) {
+          setUser(null);
+          setCart([]);
+          setCartLoaded(false);
+
+          await fetch("/api/session", { method: "DELETE" }).catch(() => {});
+
+          return;
+        }
+
+        // Mirror the Supabase access token to an HttpOnly
+        // cookie so server-side routes can verify the user
+        // without trusting the client body.
+        if (session.access_token) {
+          await fetch("/api/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ access_token: session.access_token }),
+          }).catch(() => {});
+        }
+
+        const authUser: AuthUser = {
+          id: session.user.id,
+          email: session.user.email ?? "",
+          role:
+            session.user.user_metadata?.role ?? "customer",
+          name:
+            session.user.user_metadata?.name ?? "",
+        };
+
+        setUser(authUser);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // ── Load cart from Supabase when user logs in ────────────────────────────
+  useEffect(() => {
+    if (user?.id && !cartLoaded) {
+      loadCartFromSupabase();
+    } else if (!user) {
+      setCart([]);
+      setCartLoaded(false);
+    }
+  }, [user, cartLoaded]);
+
+  async function loadCartFromSupabase() {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(`/api/cart?user_id=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        const cartItems: CartItem[] = data.map((item: any) => ({
+          id: item.id,
+          productId: item.product_id,
+          color: item.color,
+          quantity: item.quantity,
+        }));
+        setCart(cartItems);
+      }
+    } catch (error) {
+      console.error("Failed to load cart:", error);
+    } finally {
+      setCartLoaded(true);
+    }
+  }
+
+  // ── Scroll-triggered login toast ────────────────────────────────────────
+  useEffect(() => {
+    if (user || scrollPromptDismissed) return;
+
+    function onScroll() {
+      if (window.scrollY > 600 && !user) {
+        setLoginMode("toast");
+      }
+    }
+
+    window.addEventListener("scroll", onScroll, {
+      passive: true,
+    });
+
+    return () =>
+      window.removeEventListener("scroll", onScroll);
+  }, [user, scrollPromptDismissed]);
+
+  // ── Auto-dismiss login success toast ─────────────────────────────────────
+  useEffect(() => {
+    if (!loginToast) return;
+
+    const timer = setTimeout(() => {
+      setLoginToast("");
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [loginToast]);
+
+  // ── Handle AI Assistant "Add to Cart" events ────────────────────────────
+  useEffect(() => {
+    function handleAIAddToCart(event: CustomEvent) {
+      const { productId, color, quantity } = event.detail;
+      addToCart(productId, color, quantity);
+      navigate("cart");
+    }
+
+    window.addEventListener("ai-add-to-cart", handleAIAddToCart as EventListener);
+    return () => window.removeEventListener("ai-add-to-cart", handleAIAddToCart as EventListener);
+    // addToCart/navigate are stable enough; intentionally excluded to dodge
+    // a TDZ warning and an unnecessary re-subscribe loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Navigation ───────────────────────────────────────────────────────────
+  const navigate: Navigate = useCallback(
+    (target, data) => {
+      console.log("🚀 NAVIGATE:", target);
+
+      setPage(target);
+
+      if (data) {
+        setPageData(data);
+      }
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    },
+    []
+  );
+
+  // ── Login ────────────────────────────────────────────────────────────────
+  function handleLogin(authedUser: AuthUser) {
+    setUser(authedUser);
+    setLoginCount((count) => count + 1);
+    setLoginMode(null);
+    setScrollPromptDismissed(true);
+
+    setLoginToast(
+      `Welcome${
+        authedUser.name
+          ? ", " + authedUser.name
+          : ""
+      }! You're signed in. 🧶`
+    );
+
+    if (authedUser.role === "admin") {
+      navigate("admin");
+    }
+  }
+
+  // ── Logout through Supabase ──────────────────────────────────────────────
+  async function handleLogout() {
+    await supabase.auth.signOut();
+
+    setUser(null);
+    setCart([]);
+    setCartLoaded(false);
+    setPage("home");
+    setShowCustomOrder(false);
+
+    window.scrollTo({
+      top: 0,
+    });
+  }
+
+  // ── Login modal ──────────────────────────────────────────────────────────
   function openLogin() {
-    setLoginMode('modal')
+    setLoginMode("modal");
   }
 
   function dismissLogin() {
-    setLoginMode(null)
-    if (!user) setScrollPromptDismissed(true)
-  }
+    setLoginMode(null);
 
-  // Cart helpers
- function addToCart(productId: string, color: string, quantity = 1) {
-  if (!user) {
-    openLogin()
-    return false
-  }
-
-  setCart(prev => {
-    const existing = prev.find(
-      i => i.productId === productId && i.color === color
-    )
-
-    if (existing) {
-      return prev.map(i =>
-        i.productId === productId && i.color === color
-          ? { ...i, quantity: i.quantity + quantity }
-          : i
-      )
+    if (!user) {
+      setScrollPromptDismissed(true);
     }
+  }
 
-    return [...prev, { productId, color, quantity }]
-  })
+  // ── Cart (Supabase sync) ─────────────────────────────────────────────────
+  async function addToCart(
+    productId: string,
+    color: string,
+    quantity = 1
+  ) {
+    // Optimistic update
+    setCart((prev) => {
+      const existing = prev.find(
+        (item) =>
+          item.productId === productId &&
+          item.color === color
+      );
 
-  return true
-}
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === productId &&
+          item.color === color
+            ? {
+                ...item,
+                quantity: item.quantity + quantity,
+              }
+            : item
+        );
+      }
 
-  function updateCartQty(productId: string, color: string, qty: number) {
+      return [
+        ...prev,
+        {
+          productId,
+          color,
+          quantity,
+        },
+      ];
+    });
+
+    // Sync to Supabase
+    if (user?.id) {
+      try {
+        await fetch("/api/cart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user.id, product_id: productId, color, quantity }),
+        });
+      } catch (error) {
+        console.error("Failed to sync cart to Supabase:", error);
+      }
+    }
+  }
+
+  async function updateCartQty(
+    productId: string,
+    color: string,
+    qty: number
+  ) {
     if (qty <= 0) {
-      removeFromCart(productId, color)
-    } else {
-      setCart(prev => prev.map(i => i.productId === productId && i.color === color ? { ...i, quantity: qty } : i))
+      removeFromCart(productId, color);
+      return;
+    }
+
+    setCart((prev) =>
+      prev.map((item) =>
+        item.productId === productId &&
+        item.color === color
+          ? {
+              ...item,
+              quantity: qty,
+            }
+          : item
+      )
+    );
+
+    // Sync to Supabase
+    if (user?.id) {
+      const item = cart.find(i => i.productId === productId && i.color === color);
+      if (item?.id) {
+        try {
+          await fetch("/api/cart", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cart_item_id: item.id, quantity: qty }),
+          });
+        } catch (error) {
+          console.error("Failed to update cart in Supabase:", error);
+        }
+      }
     }
   }
 
-  function removeFromCart(productId: string, color: string) {
-    setCart(prev => prev.filter(i => !(i.productId === productId && i.color === color)))
+  async function removeFromCart(
+    productId: string,
+    color: string
+  ) {
+    const itemToRemove = cart.find(i => i.productId === productId && i.color === color);
+    
+    setCart((prev) =>
+      prev.filter(
+        (item) =>
+          !(
+            item.productId === productId &&
+            item.color === color
+          )
+      )
+    );
+
+    // Sync to Supabase
+    if (user?.id && itemToRemove?.id) {
+      try {
+        await fetch(`/api/cart?cart_item_id=${itemToRemove.id}&user_id=${user.id}`, {
+          method: "DELETE",
+        });
+      } catch (error) {
+        console.error("Failed to remove from cart in Supabase:", error);
+      }
+    }
   }
 
-  function clearCart() {
-    setCart([])
+  async function clearCart() {
+    if (user?.id && cart.length > 0) {
+      try {
+        await Promise.all(
+          cart
+            .filter((item) => !!item.id)
+            .map((item) =>
+              fetch(`/api/cart?cart_item_id=${item.id}&user_id=${user.id}`, {
+                method: "DELETE",
+              })
+            )
+        );
+      } catch (error) {
+        console.error("Failed to clear cart on server:", error);
+      }
+    }
+    setCart([]);
   }
 
-  const showNavbar = !ADMIN_PAGES.includes(page)
-  const showFooter = !NO_FOOTER_PAGES.includes(page)
+  // ── Layout ───────────────────────────────────────────────────────────────
+  const showNavbar = !ADMIN_PAGES.includes(page);
+  const showFooter = !NO_FOOTER_PAGES.includes(page);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FFFDF8', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#FFFDF8",
+        fontFamily:
+          "DM Sans, system-ui, sans-serif",
+      }}
+    >
+      {/* Navbar */}
       {showNavbar && (
         <Navbar
           page={page}
@@ -191,30 +440,136 @@ export default function App() {
           onLogout={handleLogout}
         />
       )}
-      {page === 'home' && <HomePage navigate={navigate} onAddToCart={addToCart} />}
-      {page === 'catalog' && (
-  <CatalogPage
-    navigate={navigate}
-    cart={cart}
-    onAddToCart={addToCart}
-    onUpdateQty={updateCartQty}
-  />
-)}
-      {page === 'product' && <ProductDetailPage navigate={navigate} productId={pageData.id ?? null} onAddToCart={addToCart} />}
-      {page === 'dashboard' && <CustomerDashboard navigate={navigate} user={user} />}
-      {page === 'admin' && <AdminDashboard navigate={navigate} onLogout={handleLogout} loginCount={loginCount} />}
-      {page === 'add-product' && <AddProductPage navigate={navigate} />}
-      {page === 'past-creations' && <PastCreationsPage navigate={navigate} />}
-      {page === 'payment' && (
+
+      {/* Home */}
+      {page === "home" && (
+        <HomePage
+          navigate={navigate}
+          onCustomOrder={() =>
+            setShowCustomOrder(true)
+          }
+          onAddToCart={addToCart}
+        />
+      )}
+
+      {/* Catalog */}
+      {page === "catalog" && (
+        <CatalogPage
+          navigate={navigate}
+          initialCategory={pageData.category}
+          onAddToCart={addToCart}
+          onCustomOrder={() =>
+            setShowCustomOrder(true)
+          }
+        />
+      )}
+
+      {/* Product */}
+      {page === "product" && (
+        <ProductDetailPage
+          navigate={navigate}
+          productId={pageData.id ?? null}
+          onAddToCart={addToCart}
+        />
+      )}
+
+      {/* Customer Dashboard */}
+      {page === "dashboard" && (
+        <CustomerDashboard
+          navigate={navigate}
+          user={user}
+          onLoginClick={openLogin}
+        />
+      )}
+
+      {/* Admin */}
+      {page === "admin" &&
+        isAdminUser(user) && (
+          <AdminDashboard
+            navigate={navigate}
+            onLogout={handleLogout}
+            loginCount={loginCount}
+          />
+        )}
+
+      {page === "admin" && !isAdminUser(user) && (
+        <main
+          style={{
+            minHeight: "60vh",
+            backgroundColor: "#FFFDF8",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "1rem",
+            padding: "3rem 1.5rem",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "2.5rem" }}>🔒</div>
+          <h2
+            style={{
+              fontFamily: "Playfair Display, Georgia, serif",
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              color: "#2E1D15",
+            }}
+          >
+            Admin access required
+          </h2>
+          <p style={{ color: "#7A6058", maxWidth: 340, lineHeight: 1.7 }}>
+            This area is only available to the maker's admin account.
+          </p>
+          <button
+            onClick={() => navigate("home")}
+            style={{
+              backgroundColor: "#C97B63",
+              color: "#FFFDF8",
+              fontWeight: 600,
+              padding: "0.7rem 1.5rem",
+              borderRadius: 50,
+              border: "none",
+              cursor: "pointer",
+              fontSize: "0.88rem",
+            }}
+          >
+            Back to home
+          </button>
+        </main>
+      )}
+
+      {/* Add Product */}
+      {page === "add-product" && isAdminUser(user) && (
+        <AddProductPage
+          navigate={navigate}
+        />
+      )}
+
+      {/* Past Creations */}
+      {page === "past-creations" && isAdminUser(user) && (
+        <PastCreationsPage
+          navigate={navigate}
+        />
+      )}
+
+      {/* Payment */}
+      {page === "payment" && (
         <PaymentPage
           navigate={navigate}
           cart={cart}
           user={user}
           onClearCart={clearCart}
+          onRequireLogin={openLogin}
         />
       )}
-      {page === 'about' && <AboutPage navigate={navigate} />}
-      {page === 'cart' && (
+
+      {/* About */}
+      {page === "about" && (
+        <AboutPage navigate={navigate} />
+      )}
+
+      {/* Cart */}
+      {page === "cart" && (
         <CartPage
           navigate={navigate}
           cart={cart}
@@ -225,9 +580,26 @@ export default function App() {
         />
       )}
 
-      {showFooter && <Footer navigate={navigate} />}
+      {/* AI Assistant */}
+      {page === "ai-assistant" && (
+        <AIAssistantPage
+          navigate={navigate}
+          user={user}
+          onRequireLogin={openLogin}
+        />
+      )}
 
-      {/* Login modal/toast */}
+      {/* Footer */}
+      {showFooter && (
+        <Footer
+          navigate={navigate}
+          onCustomOrder={() =>
+            setShowCustomOrder(true)
+          }
+        />
+      )}
+
+      {/* Login modal / scroll toast */}
       {loginMode && (
         <LoginModal
           mode={loginMode}
@@ -235,6 +607,65 @@ export default function App() {
           onDismiss={dismissLogin}
         />
       )}
+
+      {/* Custom Order modal */}
+      {showCustomOrder && (
+        <CustomOrderModal
+          user={user}
+          onClose={() =>
+            setShowCustomOrder(false)
+          }
+          onRequireLogin={() => {
+            setShowCustomOrder(false);
+            openLogin();
+          }}
+        />
+      )}
+
+      {/* Login success toast */}
+      {loginToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 200,
+            backgroundColor: "#2E1D15",
+            color: "#FFFDF8",
+            borderRadius: 50,
+            padding: "0.7rem 1.5rem",
+            fontSize: "0.88rem",
+            fontWeight: 500,
+            boxShadow:
+              "0 8px 28px rgba(46,29,21,0.3)",
+            whiteSpace: "nowrap",
+            animation: "slideUp 0.3s ease",
+          }}
+        >
+          {loginToast}
+        </div>
+      )}
+
+      {/* Toast animation */}
+      <style>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform:
+              translateX(-50%)
+              translateY(12px);
+          }
+
+          to {
+            opacity: 1;
+            transform:
+              translateX(-50%)
+              translateY(0);
+          }
+        }
+      `}</style>
     </div>
-  )
+  );
 }
+

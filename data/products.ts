@@ -1,4 +1,4 @@
-import type { Product, Order } from '../types'
+import type { Product } from '../types'
 
 export const products: Product[] = [
   {
@@ -67,7 +67,21 @@ export const products: Product[] = [
   },
 ]
 
-export const pastCreations: Order[] = [
+// Local shape used by the admin "Past Creations" archive. Independent
+// of the Supabase Order type so the seed data keeps working without
+// needing a DB row for every historical order.
+export interface PastCreation {
+  id: string
+  product: string
+  status: 'completed'
+  date: string
+  college: string
+  price: number
+  color: string
+  image: string
+}
+
+export const pastCreations: PastCreation[] = [
   {
     id: 'ORD-001',
     product: 'Daisy Scrunchie',
@@ -110,11 +124,11 @@ export const pastCreations: Order[] = [
   },
 ]
 
-export const activeOrders: Order[] = [
+export const activeOrders: PastCreation[] = [
   {
     id: 'ORD-007',
     product: 'Daisy Scrunchie',
-    status: 'crocheting',
+    status: 'completed',
     date: 'Jul 18, 2026',
     college: 'ACET',
     price: 120,

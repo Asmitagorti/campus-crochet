@@ -1,13 +1,13 @@
-import { useState } from 'react'
-import { YarnBall, CrochetFlower } from '../components/YarnDecor'
+﻿import { useState } from 'react'
+import { YarnBall, CrochetFlower } from "../YarnDecor"
 
 interface Props {
   onLogin: (role: 'student' | 'admin') => void
 }
 
 const ACCOUNTS = {
-  puppy: { password: 'puppy', role: 'student' as const },
-  admin: { password: 'admin', role: 'admin' as const },
+  'puppy': { password: 'puppy', role: 'student' as const },
+  'admin': { password: 'admin', role: 'admin' as const },
 }
 
 export default function LoginPage({ onLogin }: Props) {
@@ -133,7 +133,7 @@ export default function LoginPage({ onLogin }: Props) {
                 disabled={loading}
                 style={{ backgroundColor: loading ? '#EDD4D4' : '#C97B63', color: loading ? '#B88080' : '#FFFDF8', fontWeight: 600, padding: '0.825rem', borderRadius: 50, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '0.95rem', transition: 'background-color 0.2s', boxShadow: loading ? 'none' : '0 4px 16px rgba(201,123,99,0.28)', marginTop: '0.25rem' }}
               >
-                {loading ? 'Signing in...' : 'Sign in →'}
+                {loading ? 'Signing in...' : 'Sign in â†’'}
               </button>
             </form>
           </div>
@@ -141,7 +141,7 @@ export default function LoginPage({ onLogin }: Props) {
           {/* Hint note */}
           <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
             <p style={{ fontFamily: 'Caveat, cursive', color: '#B88080', fontSize: '0.95rem' }}>
-              Orders accepted only from Aditya institutions 🌸
+              Orders accepted only from Aditya institutions ðŸŒ¸
             </p>
           </div>
         </div>

@@ -1,26 +1,23 @@
-import { useState } from 'react'
-import type { Navigate, CartItem, AuthUser } from '../types'
-import { products } from '../data/products'
-import { CheckShieldIcon, CrochetFlower } from '../components/YarnDecor'
+﻿import { useState, useRef, useEffect } from 'react'
+import type { Navigate, CartItem, AuthUser } from "@/types"
+import { CheckShieldIcon, CrochetFlower } from "../YarnDecor"
+import { useProducts } from "@/lib/hooks"
 
 interface Props {
   navigate: Navigate
   cart: CartItem[]
   user: AuthUser | null
   onClearCart: () => void
+  onRequireLogin?: () => void
 }
 
-type Step = 'verify' | 'review' | 'pay' | 'done'
-
-const VALID_ROLL = '24p31a0574'
-const COLLEGES = ['ACET', 'AEC', 'Aditya Degree College', 'Aditya Pharmacy College', 'Other Aditya institution']
+type Step = 'review' | 'pay' | 'done'
 
 function StepBar({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
-    { key: 'verify', label: 'Verify' },
-    { key: 'review', label: 'Review' },
-    { key: 'pay', label: 'Pay' },
-    { key: 'done', label: 'Done' },
+    { key: 'review', label: 'Review Order' },
+    { key: 'pay', label: 'Payment' },
+    { key: 'done', label: 'Confirmed' },
   ]
   const idx = steps.findIndex(s => s.key === current)
   return (
@@ -42,45 +39,198 @@ function StepBar({ current }: { current: Step }) {
   )
 }
 
-export default function PaymentPage({ navigate, cart, user, onClearCart }: Props) {
-  const [step, setStep] = useState<Step>('verify')
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void
+      on: (event: string, handler: (response: unknown) => void) => void
+    }
+  }
+}
 
-  // Step 1 state
-  const [rollNumber, setRollNumber] = useState(user?.rollNumber ?? '')
-  const [college, setCollege] = useState(user?.college ?? '')
-  const [rollError, setRollError] = useState('')
-
-  // Step 3 state
+export default function PaymentPage({ navigate, cart, user, onClearCart, onRequireLogin }: Props) {
+  const [step, setStep] = useState<Step>('review')
   const [payMethod, setPayMethod] = useState<'upi' | 'card' | 'netbanking'>('upi')
   const [upiId, setUpiId] = useState('')
   const [agreed, setAgreed] = useState(false)
   const [paying, setPaying] = useState(false)
-  const [screenshotFile, setScreenshotFile] = useState<string | null>(null)
-  const [screenshotDrag, setScreenshotDrag] = useState(false)
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [payError, setPayError] = useState<string | null>(null)
+  const cartClearedRef = useRef(false)
+  const { products } = useProducts()
+
+  useEffect(() => {
+    if (step === 'done' && !cartClearedRef.current) {
+      cartClearedRef.current = true
+      onClearCart()
+    }
+  }, [step, onClearCart])
+
+  if (!user) {
+    return (
+      <main style={{ minHeight: '60vh', backgroundColor: '#FFFDF8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', textAlign: 'center', padding: '3rem 1.5rem' }}>
+        <div style={{ fontSize: '2.5rem' }}>🔐</div>
+        <h2 style={{ fontFamily: 'Playfair Display, Georgia, serif', fontSize: '1.5rem', fontWeight: 700, color: '#2E1D15' }}>Sign in to checkout</h2>
+        <p style={{ color: '#7A6058', maxWidth: 340, lineHeight: 1.7 }}>You need to be signed in with your college email to place an order.</p>
+        <button onClick={onRequireLogin} style={{ backgroundColor: '#C97B63', color: '#FFFDF8', fontWeight: 600, padding: '0.75rem 2rem', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(201,123,99,0.28)' }}>
+          Sign in to continue →
+        </button>
+        <button onClick={() => navigate('cart')} style={{ color: '#7A6058', fontSize: '0.85rem', background: 'none', border: 'none', cursor: 'pointer' }}>
+          ← Back to cart
+        </button>
+      </main>
+    )
+  }
 
   const cartDetails = cart.map(item => ({ ...item, product: products.find(p => p.id === item.productId) })).filter(i => i.product)
   const subtotal = cartDetails.reduce((s, i) => s + i.product!.price * i.quantity, 0)
 
-  // ── Step 1: Verify ─────────────────────────────────────────────────────
-  function handleVerify(e: React.FormEvent) {
-    e.preventDefault()
-    if (rollNumber.trim().toLowerCase() !== VALID_ROLL) {
-      setRollError('Roll number not found. Only students of Aditya institutions can order.')
-      return
-    }
-    if (!college) { setRollError('Please select your college.'); return }
-    setRollError('')
-    setStep('review')
-  }
-
-  // ── Step 3: Pay ────────────────────────────────────────────────────────
-  function handlePay() {
-    if (!agreed) return
+  async function proceedToPayment() {
+    if (!user?.id || cartDetails.length === 0) return
     setPaying(true)
-    setTimeout(() => { setPaying(false); setStep('done') }, 2200)
+    setPayError(null)
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          items: cartDetails.map(i => ({
+            productId: i.productId,
+            color: i.color,
+            quantity: i.quantity,
+            price: i.product!.price,
+          })),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? `Order creation failed: ${res.status}`)
+      }
+      const data = await res.json()
+      setOrderId(data.order.id)
+      setStep('pay')
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to create order.'
+      console.error('proceedToPayment error:', e)
+      setPayError(message)
+    } finally {
+      setPaying(false)
+    }
   }
 
-  // ── Step 4: Done ───────────────────────────────────────────────────────
+  async function loadRazorpayScript(): Promise<boolean> {
+    if (typeof window === 'undefined') return false
+    if (window.Razorpay) return true
+    return new Promise((resolve) => {
+      const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay]')
+      if (existing) {
+        existing.addEventListener('load', () => resolve(!!window.Razorpay))
+        existing.addEventListener('error', () => resolve(false))
+        return
+      }
+      const script = document.createElement('script')
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      script.async = true
+      script.dataset.razorpay = 'true'
+      script.onload = () => resolve(!!window.Razorpay)
+      script.onerror = () => resolve(false)
+      document.head.appendChild(script)
+    })
+  }
+
+  async function handlePay() {
+    if (!agreed || !orderId || paying) return
+    const currentUser = user
+    if (!currentUser) return
+    setPaying(true)
+    setPayError(null)
+    try {
+      const rzCreate = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: subtotal,
+          currency: 'INR',
+          receipt: `order_${orderId}`,
+          notes: { order_id: orderId },
+        }),
+      })
+
+      if (!rzCreate.ok) {
+        const err = await rzCreate.json().catch(() => ({}))
+        throw new Error(err.error ?? `Payment init failed: ${rzCreate.status}`)
+      }
+
+      const rz = await rzCreate.json()
+      const scriptReady = await loadRazorpayScript()
+
+      if (scriptReady && window.Razorpay) {
+        await new Promise<void>((resolve, reject) => {
+          try {
+            const options: Record<string, unknown> = {
+              key: rz.key_id,
+              amount: rz.amount,
+              currency: rz.currency,
+              name: 'Campus Crochet',
+              description: `Order ${orderId}`,
+              order_id: rz.order_id,
+              handler: async (response: {
+                razorpay_order_id: string
+                razorpay_payment_id: string
+                razorpay_signature: string
+              }) => {
+                const verifyRes = await fetch('/api/razorpay/verify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature,
+                    order_id: orderId,
+                  }),
+                })
+                if (!verifyRes.ok) {
+                  const err = await verifyRes.json().catch(() => ({}))
+                  reject(new Error(err.error ?? 'Verification failed'))
+                  return
+                }
+                setStep('done')
+                resolve()
+              },
+              prefill: {
+                name: currentUser.name,
+                email: currentUser.email ?? "",
+              },
+              theme: { color: '#C97B63' },
+              modal: {
+                ondismiss: () => {
+                  reject(new Error('Payment cancelled'))
+                },
+              },
+            }
+            const rzp = new window.Razorpay!(options)
+            rzp.on('payment.failed', (resp: unknown) => {
+              const description = (resp as { error?: { description?: string } } | undefined)?.error?.description
+              reject(new Error(description ?? 'Payment failed'))
+            })
+            rzp.open()
+          } catch (openErr) {
+            reject(openErr instanceof Error ? openErr : new Error('Could not open checkout'))
+          }
+        })
+      } else {
+        throw new Error('Payment gateway is unavailable. Please contact the maker to complete your order.')
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Payment failed.'
+      console.error('handlePay error:', e)
+      setPayError(message)
+    } finally {
+      setPaying(false)
+    }
+  }
+
   if (step === 'done') {
     return (
       <main style={{ minHeight: '100vh', backgroundColor: '#FFFDF8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 1.5rem', textAlign: 'center' }}>
@@ -89,7 +239,7 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
           Your handmade order has been added to my crochet queue! 🧶💛
         </h2>
         <p style={{ color: '#7A6058', fontSize: '0.95rem', maxWidth: 380, lineHeight: 1.75, marginBottom: '2rem' }}>
-          I'll start working on it soon. It should be ready for campus pickup in <strong>3–5 working days</strong>. You'll get a message when it's ready!
+          I'll start working on it soon. It should be ready for campus pickup in <strong>3–5 working days</strong>. You&apos;ll get a message when it&apos;s ready!
         </p>
         <div style={{ display: 'flex', gap: 12, marginBottom: '2.5rem', justifyContent: 'center' }}>
           {['#D8A7A7', '#A8B8A0', '#B7A7D8', '#C97B63'].map((c, i) => (
@@ -99,7 +249,7 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
           ))}
         </div>
         <button
-          onClick={() => { onClearCart(); navigate('dashboard') }}
+          onClick={() => navigate('dashboard')}
           style={{ backgroundColor: '#C97B63', color: '#FFFDF8', fontWeight: 700, padding: '0.875rem 2.25rem', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: '0.95rem', boxShadow: '0 4px 16px rgba(201,123,99,0.3)' }}
         >
           View My Orders →
@@ -115,7 +265,6 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#FFFDF8' }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '3rem 1.5rem' }}>
-        {/* Breadcrumb */}
         <div style={{ display: 'flex', gap: 8, fontSize: '0.78rem', color: '#7A6058', marginBottom: '2rem', alignItems: 'center' }}>
           <button onClick={() => navigate('home')} style={{ color: '#7A6058', background: 'none', border: 'none', cursor: 'pointer' }}>Home</button>
           <span>/</span>
@@ -129,59 +278,6 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
 
         <StepBar current={step} />
 
-        {/* ── Step 1: Verify ── */}
-        {step === 'verify' && (
-          <div style={{ backgroundColor: '#F7F3EC', borderRadius: 24, border: '1px solid #EDD4D4', padding: '2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: '#FDF0EC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C97B63" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>
-              </div>
-              <div>
-                <h2 style={{ fontWeight: 700, color: '#2E1D15', fontSize: '1.1rem' }}>Verify Student Identity</h2>
-                <p style={{ color: '#7A6058', fontSize: '0.8rem' }}>Orders are accepted only from Aditya institution students.</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={labelSt}>Roll Number *</label>
-                <input
-                  type="text"
-                  value={rollNumber}
-                  onChange={e => { setRollNumber(e.target.value); setRollError('') }}
-                  placeholder="e.g. 24P31A0574"
-                  required
-                  style={inSt}
-                  onFocus={e => e.target.style.borderColor = '#C97B63'}
-                  onBlur={e => e.target.style.borderColor = '#EDD4D4'}
-                />
-              </div>
-              <div>
-                <label style={labelSt}>Your College *</label>
-                <select value={college} onChange={e => { setCollege(e.target.value); setRollError('') }} required style={inSt}>
-                  <option value="">Select your college</option>
-                  {COLLEGES.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-
-              {rollError && (
-                <div style={{ backgroundColor: '#FDF0EC', borderRadius: 10, padding: '0.65rem 0.9rem', border: '1px solid #EDD4D4', fontSize: '0.8rem', color: '#A86248', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>⚠</span> {rollError}
-                </div>
-              )}
-
-              <button type="submit" style={{ backgroundColor: '#C97B63', color: '#FFFDF8', fontWeight: 700, padding: '0.85rem', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: '0.92rem', boxShadow: '0 4px 14px rgba(201,123,99,0.28)', marginTop: '0.5rem' }}>
-                Verify & Continue →
-              </button>
-            </form>
-
-            <p style={{ color: '#B88080', fontSize: '0.74rem', marginTop: '1rem', lineHeight: 1.5 }}>
-              Your roll number is verified against Aditya institution records. We do not store or share this information.
-            </p>
-          </div>
-        )}
-
-        {/* ── Step 2: Review ── */}
         {step === 'review' && (
           <div>
             <div style={{ backgroundColor: '#F7F3EC', borderRadius: 24, border: '1px solid #EDD4D4', overflow: 'hidden', marginBottom: '1.25rem' }}>
@@ -193,7 +289,6 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
                 <button onClick={() => navigate('cart')} style={{ color: '#C97B63', fontSize: '0.8rem', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Edit cart</button>
               </div>
 
-              {/* Items */}
               {cartDetails.map(item => (
                 <div key={`${item.productId}-${item.color}`} style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #EDD4D4', display: 'grid', gridTemplateColumns: '56px 1fr auto', gap: '1rem', alignItems: 'center' }}>
                   <div style={{ borderRadius: 10, overflow: 'hidden', aspectRatio: '4/5', backgroundColor: '#EDD4D4' }}>
@@ -208,11 +303,10 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
                 </div>
               ))}
 
-              {/* Totals */}
               <div style={{ padding: '1.25rem 1.5rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#7A6058' }}><span>Subtotal</span><span>₹{subtotal}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#A8B8A0' }}><span>Delivery</span><span>₹0 · campus pickup</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#A8B8A0' }}><span>Delivery</span><span>₹0 · cash on pickup</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid #EDD4D4', marginTop: '0.25rem' }}>
                     <span style={{ fontWeight: 700, color: '#2E1D15' }}>Total</span>
                     <span style={{ fontWeight: 700, color: '#C97B63', fontSize: '1.2rem' }}>₹{subtotal}</span>
@@ -221,18 +315,17 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
               </div>
             </div>
 
-            {/* Verified student info */}
             <div style={{ backgroundColor: '#F7F3EC', borderRadius: 16, border: '1px solid #EDD4D4', padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7A6058', marginBottom: 2 }}>Verified student</p>
-                <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2E1D15' }}>{rollNumber.toUpperCase()} · {college}</p>
+                <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7A6058', marginBottom: 2 }}>Ordering as</p>
+                <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2E1D15' }}>{user.name}</p>
+                {user.email && <p style={{ fontSize: '0.75rem', color: '#7A6058', marginTop: 1 }}>{user.email}</p>}
               </div>
               <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: '#C8D8C0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3A6B3A" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
             </div>
 
-            {/* Ordering time info */}
             <div style={{ backgroundColor: '#F7F3EC', borderRadius: 16, border: '1px solid #EDD4D4', padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
               <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#7A6058', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Order Timeline</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
@@ -248,10 +341,9 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
                   </div>
                 ))}
               </div>
-              <p style={{ color: '#A8B8A0', fontSize: '0.72rem', marginTop: '0.6rem', textAlign: 'center' }}>Campus pickup · no delivery · we'll message you when it's ready</p>
+              <p style={{ color: '#A8B8A0', fontSize: '0.72rem', marginTop: '0.6rem', textAlign: 'center' }}>Cash on pickup · no delivery · we&apos;ll message you when it&apos;s ready</p>
             </div>
 
-            {/* Policy reminder */}
             <div style={{ backgroundColor: '#2E1D15', borderRadius: 16, padding: '1.1rem 1.25rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
                 <CheckShieldIcon size={20} color="#A8B8A0" />
@@ -261,13 +353,17 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
               </div>
             </div>
 
-            <button onClick={() => setStep('pay')} style={{ width: '100%', backgroundColor: '#C97B63', color: '#FFFDF8', fontWeight: 700, padding: '0.9rem', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: '0.95rem', boxShadow: '0 4px 16px rgba(201,123,99,0.3)' }}>
-              Proceed to Payment →
+            <button onClick={proceedToPayment} disabled={paying} style={{ width: '100%', backgroundColor: paying ? '#EDD4D4' : '#C97B63', color: paying ? '#B88080' : '#FFFDF8', fontWeight: 700, padding: '0.9rem', borderRadius: 50, border: 'none', cursor: paying ? 'not-allowed' : 'pointer', fontSize: '0.95rem', boxShadow: paying ? 'none' : '0 4px 16px rgba(201,123,99,0.3)' }}>
+              {paying ? '⏳ Creating order…' : 'Proceed to Payment →'}
             </button>
+            {payError && (
+              <p style={{ marginTop: '0.75rem', color: '#A86248', fontSize: '0.82rem', textAlign: 'center' }}>
+                {payError}
+              </p>
+            )}
           </div>
         )}
 
-        {/* ── Step 3: Pay ── */}
         {step === 'pay' && (
           <div>
             <div style={{ backgroundColor: '#F7F3EC', borderRadius: 24, border: '1px solid #EDD4D4', padding: '1.75rem', marginBottom: '1.25rem' }}>
@@ -279,16 +375,14 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
                 <span style={{ color: '#7A6058', fontSize: '0.78rem' }}>Secure Payment · 256-bit SSL</span>
               </div>
 
-              {/* Order total reminder */}
               <div style={{ backgroundColor: '#FFFDF8', borderRadius: 12, padding: '0.85rem 1rem', border: '1px solid #EDD4D4', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#7A6058', fontSize: '0.85rem' }}>Amount to pay</span>
                 <span style={{ fontWeight: 700, color: '#C97B63', fontSize: '1.2rem' }}>₹{subtotal}</span>
               </div>
 
-              {/* Method tabs */}
               <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem' }}>
                 {(['upi', 'card', 'netbanking'] as const).map(m => (
-                  <button key={m} onClick={() => setPayMethod(m)} style={{ padding: '0.4rem 1rem', borderRadius: 50, fontSize: '0.78rem', fontWeight: 600, border: payMethod === m ? '2px solid #2D81F7' : '1.5px solid #EDD4D4', backgroundColor: payMethod === m ? 'rgba(45,129,247,0.08)' : '#FFFDF8', color: payMethod === m ? '#2D81F7' : '#7A6058', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <button key={m} onClick={() => setPayMethod(m)} style={{ padding: '0.4rem 1rem', borderRadius: 50, fontSize: '0.78rem', fontWeight: 600, border: payMethod === m ? '2px solid #2D81F7' : '1.5px solid #EDD4D4', backgroundColor: payMethod === m ? 'rgba(45,11,247,0.08)' : '#FFFDF8', color: payMethod === m ? '#2D81F7' : '#7A6058', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     {m === 'netbanking' ? 'Net Banking' : m.toUpperCase()}
                   </button>
                 ))}
@@ -329,40 +423,14 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
               </p>
             </div>
 
-            {/* Payment screenshot upload */}
-            <div style={{ backgroundColor: '#F7F3EC', borderRadius: 20, border: '1px solid #EDD4D4', padding: '1.5rem', marginBottom: '1.25rem' }}>
-              <p style={{ fontWeight: 600, color: '#2E1D15', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Upload Payment Screenshot</p>
-              <p style={{ color: '#7A6058', fontSize: '0.78rem', marginBottom: '1rem' }}>After paying, upload a screenshot of the confirmation. This helps us verify your payment quickly.</p>
-
-              {screenshotFile ? (
-                <div style={{ position: 'relative' }}>
-                  <img src={screenshotFile} alt="Payment screenshot" style={{ width: '100%', borderRadius: 12, maxHeight: 200, objectFit: 'cover', border: '1px solid #EDD4D4' }} />
-                  <button
-                    onClick={() => setScreenshotFile(null)}
-                    style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', backgroundColor: '#2E1D15', color: '#FFFDF8', border: 'none', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >×</button>
-                  <div style={{ marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3A6B3A" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span style={{ color: '#3A6B3A', fontSize: '0.78rem', fontWeight: 600 }}>Screenshot uploaded</span>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onDragOver={e => { e.preventDefault(); setScreenshotDrag(true) }}
-                  onDragLeave={() => setScreenshotDrag(false)}
-                  onDrop={e => { e.preventDefault(); setScreenshotDrag(false); const f = e.dataTransfer.files[0]; if (f?.type.startsWith('image/')) setScreenshotFile(URL.createObjectURL(f)) }}
-                  onClick={() => document.getElementById('screenshot-input')?.click()}
-                  style={{ border: `2px dashed ${screenshotDrag ? '#C97B63' : '#EDD4D4'}`, borderRadius: 14, padding: '2rem', textAlign: 'center', cursor: 'pointer', backgroundColor: screenshotDrag ? '#FDF0EC' : '#FFFDF8', transition: 'all 0.2s' }}
-                >
-                  <input id="screenshot-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) setScreenshotFile(URL.createObjectURL(f)) }} />
-                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📷</div>
-                  <p style={{ color: '#7A6058', fontSize: '0.82rem', fontWeight: 500 }}>Drop screenshot here or click to upload</p>
-                  <p style={{ color: '#B88080', fontSize: '0.72rem', marginTop: '0.25rem' }}>PNG, JPG · optional but recommended</p>
-                </div>
-              )}
+            <div style={{ backgroundColor: '#F7F3EC', borderRadius: 16, border: '1px solid #EDD4D4', padding: '1rem 1.25rem', marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '1.25rem' }}>📱</span>
+              <div>
+                <p style={{ fontWeight: 600, color: '#2E1D15', fontSize: '0.88rem', marginBottom: 2 }}>Pickup OTP</p>
+                <p style={{ color: '#7A6058', fontSize: '0.76rem', lineHeight: 1.6 }}>A one-time code will be generated after your order is ready. Show it during campus pickup to confirm handover.</p>
+              </div>
             </div>
 
-            {/* Agreement */}
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', marginBottom: '1.25rem' }}>
               <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 3, accentColor: '#C97B63' }} />
               <span style={{ color: '#7A6058', fontSize: '0.8rem', lineHeight: 1.6 }}>
@@ -375,8 +443,14 @@ export default function PaymentPage({ navigate, cart, user, onClearCart }: Props
               disabled={paying || !agreed}
               style={{ width: '100%', backgroundColor: !agreed ? '#EDD4D4' : '#C97B63', color: !agreed ? '#B88080' : '#FFFDF8', fontWeight: 700, padding: '0.9rem', borderRadius: 50, border: 'none', cursor: !agreed ? 'not-allowed' : 'pointer', fontSize: '0.95rem', boxShadow: agreed ? '0 4px 16px rgba(201,123,99,0.3)' : 'none', transition: 'all 0.2s', marginBottom: '0.75rem' }}
             >
-              {paying ? '⏳ Processing payment...' : `Pay ₹${subtotal} via Razorpay`}
+              {paying ? '⏳ Opening Razorpay…' : `Pay ₹${subtotal} via Razorpay`}
             </button>
+
+            {payError && (
+              <p style={{ marginTop: '0.5rem', color: '#A86248', fontSize: '0.82rem', textAlign: 'center', marginBottom: '0.5rem' }}>
+                {payError}
+              </p>
+            )}
 
             <button onClick={() => setStep('review')} style={{ width: '100%', color: '#7A6058', fontSize: '0.82rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0.4rem' }}>
               ← Back to order review

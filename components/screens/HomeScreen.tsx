@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import type { Navigate } from '../types'
-import { products, pastCreations } from '../data/products'
-import { YarnBall, CrochetFlower, StitchDivider, WavyThread, CheckShieldIcon, MapPinIcon, HeartIcon, YarnIcon } from '../components/YarnDecor'
+﻿import { useState } from 'react'
+import type { Navigate } from "@/types"
+import { YarnBall, CrochetFlower, StitchDivider, WavyThread, CheckShieldIcon, MapPinIcon, HeartIcon, YarnIcon } from "../YarnDecor"
+import { useProducts } from "@/lib/hooks"
 
 interface Props {
   navigate: Navigate
   onAddToCart?: (productId: string, color: string, quantity: number) => void
+  onCustomOrder?: () => void
 }
 
 function TrustItem({ icon, title, sub }: { icon: React.ReactNode; title: string; sub: string }) {
@@ -47,20 +48,24 @@ function PolicyCard({ icon, title, children }: { icon: React.ReactNode; title: s
   )
 }
 
-export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props) {
-  const [college, setCollege] = useState('')
+export default function HomePage({ navigate, onAddToCart, onCustomOrder }: Props) {
+  const { products } = useProducts()
   const [addedId, setAddedId] = useState<string | null>(null)
 
   function handleAddToCart(id: string) {
+    const product = products.find(p => p.id === id)
+    if (product && onAddToCart) {
+      onAddToCart(id, product.colors[0] || 'Default', 1)
+    }
     setAddedId(id)
     setTimeout(() => setAddedId(null), 2000)
   }
 
-  const featured = products.slice(0, 3)
+  const featured = (products ?? []).slice(0, 3)
 
   return (
     <main style={{ backgroundColor: '#FFFDF8' }}>
-      {/* ── HERO ── */}
+      {/* â”€â”€ HERO â”€â”€ */}
       <section style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', backgroundColor: '#FFFDF8', position: 'relative', overflow: 'hidden' }}>
         {/* Subtle background yarn balls */}
         <div style={{ position: 'absolute', top: '8%', left: '2%', opacity: 0.25 }}>
@@ -78,14 +83,14 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
             {/* Left: copy */}
             <div>
               <p style={{ fontFamily: 'Caveat, cursive', color: '#C97B63', fontSize: '1.2rem', marginBottom: '1rem' }}>
-                🧶 Made just for you, by a student
+                ðŸ§¶ Made just for you, by a student
               </p>
               <h1 style={{ fontFamily: 'Playfair Display, Georgia, serif', fontSize: 'clamp(2.4rem, 4vw, 3.6rem)', fontWeight: 700, color: '#2E1D15', lineHeight: 1.15, marginBottom: '1.25rem' }}>
                 Handmade pieces,<br />
                 <em style={{ color: '#C97B63', fontStyle: 'italic' }}>stitched with love.</em>
               </h1>
               <p style={{ color: '#7A6058', fontSize: '1rem', lineHeight: 1.8, maxWidth: 420, marginBottom: '2rem' }}>
-                Every piece is crocheted by hand using locally sourced yarn — made only after you order, and carefully checked before handover. This is not mass production. This is craft.
+                Every piece is crocheted by hand using locally sourced yarn â€” made only after you order, and carefully checked before handover. This is not mass production. This is craft.
               </p>
 
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
@@ -98,7 +103,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
                   Explore Collection
                 </button>
                 <button
-                  onClick={() => navigate('catalog')}
+                  onClick={() => onCustomOrder?.()}
                   style={{ backgroundColor: 'transparent', color: '#8B6B5C', padding: '0.75rem 1.75rem', borderRadius: 50, fontWeight: 500, fontSize: '0.95rem', border: '1.5px solid #C9B4AC', cursor: 'pointer', transition: 'all 0.2s' }}
                   onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#F7F3EC'; e.currentTarget.style.borderColor = '#8B6B5C' }}
                   onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#C9B4AC' }}
@@ -108,7 +113,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               </div>
 
               <p style={{ fontFamily: 'Caveat, cursive', color: '#B88080', fontSize: '1.05rem' }}>
-                Made after you order · 3–5 working days
+                Made after you order Â· 3â€“5 working days
               </p>
             </div>
 
@@ -126,7 +131,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
                 <HeartIcon size={18} color="#D8A7A7" />
                 <div>
                   <p style={{ fontSize: '0.75rem', color: '#7A6058' }}>Latest creation</p>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2E1D15' }}>Daisy Scrunchie · ₹120</p>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2E1D15' }}>Daisy Scrunchie Â· â‚¹120</p>
                 </div>
               </div>
               {/* Top accent */}
@@ -138,7 +143,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
         </div>
       </section>
 
-      {/* ── TRUST STRIP ── */}
+      {/* â”€â”€ TRUST STRIP â”€â”€ */}
       <section style={{ backgroundColor: '#A8B8A0', padding: '2rem 0' }}>
         <div className="max-w-[1200px] mx-auto px-6">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
@@ -150,7 +155,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
         </div>
       </section>
 
-      {/* ── FEATURED COLLECTION ── */}
+      {/* â”€â”€ FEATURED COLLECTION â”€â”€ */}
       <section style={{ padding: '96px 0' }}>
         <div className="max-w-[1200px] mx-auto px-6">
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -159,7 +164,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               Featured Collection
             </h2>
             <p style={{ color: '#7A6058', maxWidth: 440, margin: '0 auto' }}>
-              A small, curated selection — each piece made fresh, only after your order arrives.
+              A small, curated selection â€” each piece made fresh, only after your order arrives.
             </p>
           </div>
 
@@ -188,14 +193,14 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
                     onClick={e => { e.stopPropagation(); handleAddToCart(p.id) }}
                     className="group-hover:opacity-100"
                   >
-                    {addedId === p.id ? '✓ Added!' : 'Quick Add'}
+                    {addedId === p.id ? 'âœ“ Added!' : 'Quick Add'}
                   </button>
                 </div>
                 <div style={{ padding: 24 }}>
                   <p style={{ fontFamily: 'Playfair Display, Georgia, serif', fontWeight: 600, fontSize: '1.1rem', color: '#2E1D15', marginBottom: 4 }}>{p.name}</p>
                   <p style={{ color: '#7A6058', fontSize: '0.82rem', marginBottom: 12 }}>{p.category}</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#C97B63' }}>₹{p.price}</span>
+                    <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#C97B63' }}>â‚¹{p.price}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {p.colors.slice(0, 3).map(c => (
                         <span key={c} style={{ fontSize: '0.72rem', color: '#8B6B5C', backgroundColor: '#FFFDF8', padding: '0.15rem 0.4rem', borderRadius: 4, border: '1px solid #EDD4D4' }}>{c}</span>
@@ -214,7 +219,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#C97B63'; e.currentTarget.style.color = '#FFFDF8' }}
               onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#C97B63' }}
             >
-              View Full Collection →
+              View Full Collection â†’
             </button>
           </div>
         </div>
@@ -222,7 +227,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
 
       <StitchDivider className="w-full opacity-40" />
 
-      {/* ── OUR STORY ── */}
+      {/* â”€â”€ OUR STORY â”€â”€ */}
       <section style={{ padding: '96px 0', backgroundColor: '#F7F3EC' }}>
         <div className="max-w-[1200px] mx-auto px-6">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5rem', alignItems: 'center' }}>
@@ -244,10 +249,10 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
                 Built by a student who never stopped creating with their hands.
               </h2>
               <p style={{ color: '#7A6058', lineHeight: 1.85, marginBottom: '1rem', fontSize: '0.95rem' }}>
-                Campus Crochet started as a hobby — a needle, some yarn, and a lot of late nights between classes. What began as small gifts for friends slowly grew into something more. Each piece carries the care and patience of someone who genuinely loves making things.
+                Campus Crochet started as a hobby â€” a needle, some yarn, and a lot of late nights between classes. What began as small gifts for friends slowly grew into something more. Each piece carries the care and patience of someone who genuinely loves making things.
               </p>
               <p style={{ color: '#7A6058', lineHeight: 1.85, marginBottom: '1.5rem', fontSize: '0.95rem' }}>
-                This is a passion project, not a mass-production business. Orders are accepted only from fellow students at Aditya institutions — because I believe in personal connections, and I want you to trust who's making your piece.
+                This is a passion project, not a mass-production business. Orders are accepted only from fellow students at Aditya institutions â€” because I believe in personal connections, and I want you to trust who's making your piece.
               </p>
               <blockquote style={{ borderLeft: '3px solid #D8A7A7', paddingLeft: '1.25rem', fontFamily: 'Playfair Display, Georgia, serif', fontStyle: 'italic', color: '#8B6B5C', fontSize: '1.05rem' }}>
                 "Every piece is made with the same care I'd put into something for myself."
@@ -257,7 +262,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
         </div>
       </section>
 
-      {/* ── PROCESS TIMELINE ── */}
+      {/* â”€â”€ PROCESS TIMELINE â”€â”€ */}
       <section style={{ padding: '96px 0' }}>
         <div className="max-w-[1200px] mx-auto px-6">
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -287,7 +292,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               n={3}
               icon={<NeedleStitchIcon />}
               title="I crochet your order"
-              sub="Your piece is made fresh — 3 to 5 working days of careful craft."
+              sub="Your piece is made fresh â€” 3 to 5 working days of careful craft."
             />
             <ProcessStep
               n={4}
@@ -299,7 +304,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
         </div>
       </section>
 
-      {/* ── PAST CREATIONS ── */}
+      {/* â”€â”€ PAST CREATIONS â”€â”€ */}
       <section style={{ padding: '96px 0', backgroundColor: '#F7F3EC' }}>
         <div className="max-w-[1200px] mx-auto px-6">
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -308,27 +313,24 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               Past Creations
             </h2>
             <p style={{ color: '#7A6058', marginTop: '0.5rem', maxWidth: 380, margin: '0.5rem auto 0' }}>
-              Every card below is a real order that was made, checked, and delivered.
+              Browse the live collection to see everything that's available now.
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
-            {pastCreations.map(o => (
-              <div key={o.id} style={{ borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFDF8', border: '1px solid #EDD4D4', boxShadow: '0 4px 16px rgba(46,29,21,0.04)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
+            {(products ?? []).slice(0, 3).map(p => (
+              <div key={p.id} style={{ borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFDF8', border: '1px solid #EDD4D4', boxShadow: '0 4px 16px rgba(46,29,21,0.04)', cursor: 'pointer' }} onClick={() => navigate('product', { id: p.id })}>
                 <div style={{ aspectRatio: '1/1', backgroundColor: '#EDD4D4', overflow: 'hidden' }}>
-                  <img src={o.image} alt={o.product} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={{ padding: '1rem' }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-                    {['Handmade', 'Completed', 'Real order'].map(b => (
-                      <span key={b} style={{ fontSize: '0.65rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 50, backgroundColor: b === 'Completed' ? '#C8D8C0' : b === 'Real order' ? '#EDD4D4' : '#D4C8EE', color: b === 'Completed' ? '#3A6B3A' : b === 'Real order' ? '#8B4A3A' : '#4A3A8B' }}>
-                        {b}
-                      </span>
-                    ))}
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 50, backgroundColor: '#D4C8EE', color: '#4A3A8B' }}>Handmade</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 50, backgroundColor: '#EDD4D4', color: '#8B4A3A' }}>From â‚¹{p.price}</span>
                   </div>
-                  <p style={{ fontWeight: 600, fontSize: '0.85rem', color: '#2E1D15' }}>{o.product}</p>
+                  <p style={{ fontWeight: 600, fontSize: '0.85rem', color: '#2E1D15' }}>{p.name}</p>
                   <p style={{ fontFamily: 'Caveat, cursive', color: '#7A6058', fontSize: '0.9rem', marginTop: 2 }}>
-                    {o.color} · {o.college} · {o.date}
+                    {p.category}
                   </p>
                 </div>
               </div>
@@ -337,7 +339,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
         </div>
       </section>
 
-      {/* ── HANDMADE TRUST SECTION ── */}
+      {/* â”€â”€ HANDMADE TRUST SECTION â”€â”€ */}
       <section style={{ padding: '96px 0' }}>
         <div className="max-w-[1200px] mx-auto px-6">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'start' }}>
@@ -345,13 +347,13 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
             <div style={{ backgroundColor: '#F7F3EC', borderRadius: 24, padding: '2.5rem', border: '1px solid #EDD4D4' }}>
               <CrochetFlower size={36} color="#D8A7A7" />
               <h3 style={{ fontFamily: 'Playfair Display, Georgia, serif', fontSize: '1.5rem', fontWeight: 700, color: '#2E1D15', marginTop: '1rem', marginBottom: '0.75rem', lineHeight: 1.3 }}>
-                Every piece is handmade — and that makes it unique.
+                Every piece is handmade â€” and that makes it unique.
               </h3>
               <p style={{ color: '#7A6058', lineHeight: 1.8, fontSize: '0.9rem', marginBottom: '1rem' }}>
                 Slight variations in stitch tension, flower shape, or placement are natural. No two handmade pieces will be perfectly identical.
               </p>
               <p style={{ color: '#7A6058', lineHeight: 1.8, fontSize: '0.9rem' }}>
-                These tiny differences are a sign of genuine craftsmanship — and they make each order uniquely yours.
+                These tiny differences are a sign of genuine craftsmanship â€” and they make each order uniquely yours.
               </p>
             </div>
 
@@ -374,7 +376,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               </p>
               <div style={{ marginTop: '1.5rem', padding: '0.75rem 1.25rem', backgroundColor: 'rgba(168,184,160,0.15)', borderRadius: 12, border: '1px solid rgba(168,184,160,0.3)' }}>
                 <p style={{ fontFamily: 'Caveat, cursive', color: '#A8B8A0', fontSize: '1.05rem' }}>
-                  Your trust means everything. 🌿
+                  Your trust means everything. ðŸŒ¿
                 </p>
               </div>
             </div>
@@ -382,7 +384,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
         </div>
       </section>
 
-      {/* ── BEFORE YOU ORDER ── */}
+      {/* â”€â”€ BEFORE YOU ORDER â”€â”€ */}
       <section style={{ padding: '96px 0', backgroundColor: '#F7F3EC' }}>
         <div className="max-w-[1200px] mx-auto px-6">
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -397,20 +399,8 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A8B8A0" strokeWidth="1.5" strokeLinecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>}
               title="Who can order?"
             >
-              <p>Orders are accepted only from <strong>students of Aditya educational institutions in Surampalem.</strong></p>
-              <div style={{ marginTop: '0.6rem' }}>
-                <label style={{ fontSize: '0.78rem', color: '#8B6B5C', display: 'block', marginBottom: 4 }}>Your college</label>
-                <select
-                  value={college}
-                  onChange={e => setCollege(e.target.value)}
-                  style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 8, border: '1px solid #EDD4D4', backgroundColor: '#FFFDF8', color: '#2E1D15', fontSize: '0.82rem', outline: 'none' }}
-                >
-                  <option value="">Select your college</option>
-                  {['ACET', 'AEC', 'Aditya Degree College', 'Aditya Pharmacy College', 'Other Aditya institution'].map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
+              <p><strong>Only Aditya students from Aditya Surampalem, Kakinada</strong> can order from Campus Crochet.</p>
+              <p style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#8B6B5C' }}>Sign in with your college email to get started.</p>
             </PolicyCard>
 
             <PolicyCard icon={<MapPinIcon size={20} color="#C97B63" />} title="Campus pickup only">
@@ -421,7 +411,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B7A7D8" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
               title="Processing time"
             >
-              <p><strong>3–5 working days</strong> after payment is received. Exam periods may slightly affect timelines — I'll keep you informed.</p>
+              <p><strong>3â€“5 working days</strong> after payment is received. Exam periods may slightly affect timelines â€” I'll keep you informed.</p>
             </PolicyCard>
 
             <PolicyCard
@@ -446,7 +436,7 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
         </div>
       </section>
 
-      {/* ── CUSTOM CTA ── */}
+      {/* â”€â”€ CUSTOM CTA â”€â”€ */}
       <section style={{ padding: '96px 0' }}>
         <div className="max-w-[1200px] mx-auto px-6">
           <div style={{ backgroundColor: '#C97B63', borderRadius: 28, padding: '3.5rem 3rem', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
@@ -466,12 +456,12 @@ export default function HomePage({ navigate, onAddToCart: _onAddToCart }: Props)
               Have a color, design, or idea in mind? Send a message and let's talk about creating something just for you.
             </p>
             <button
-              onClick={() => navigate('catalog')}
+              onClick={() => onCustomOrder?.()}
               style={{ backgroundColor: '#FFFDF8', color: '#C97B63', fontWeight: 600, padding: '0.875rem 2.25rem', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: '0.95rem', transition: 'all 0.2s', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = '#F7F3EC'}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = '#FFFDF8'}
             >
-              Request a Custom Piece →
+              Request a Custom Piece â†’
             </button>
           </div>
         </div>

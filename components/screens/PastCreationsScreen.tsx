@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import type { Navigate } from '../types'
-import { pastCreations } from '../data/products'
-import { YarnBall, CrochetFlower } from '../components/YarnDecor'
+﻿import { useState } from 'react'
+import type { Navigate } from "@/types"
+import { pastCreations } from "@/data/products"
+import { YarnBall, CrochetFlower } from "../YarnDecor"
 
 const refImages = [
   'https://images.unsplash.com/photo-1700170447159-9d2d0da133a5?w=400&h=500&fit=crop&auto=format',
@@ -85,7 +85,7 @@ export default function PastCreationsPage({ navigate }: { navigate: Navigate }) 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                   <div>
                     <p style={{ fontWeight: 600, color: '#2E1D15', fontSize: '0.9rem' }}>{o.product}</p>
-                    <p style={{ color: '#7A6058', fontSize: '0.78rem', marginTop: 2 }}>{o.color} · {o.college} · {o.date}</p>
+                    <p style={{ color: '#7A6058', fontSize: '0.78rem', marginTop: 2 }}>{o.color} Â· {o.college} Â· {o.date}</p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ fontFamily: 'Playfair Display, Georgia, serif', fontWeight: 700, fontSize: '1.1rem', color: similarityScores[i] >= 90 ? '#3A6B3A' : '#8B4A3A' }}>
@@ -120,7 +120,7 @@ export default function PastCreationsPage({ navigate }: { navigate: Navigate }) 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <h3 style={{ fontFamily: 'Playfair Display, Georgia, serif', fontSize: '1.25rem', fontWeight: 700, color: '#2E1D15' }}>Side-by-Side Comparison</h3>
-                <p style={{ color: '#7A6058', fontSize: '0.82rem', marginTop: 4 }}>Listing Photo vs Final Handmade Photo · {selectedCreation.product}</p>
+                <p style={{ color: '#7A6058', fontSize: '0.82rem', marginTop: 4 }}>Listing Photo vs Final Handmade Photo Â· {selectedCreation.product}</p>
               </div>
               <span style={{ fontFamily: 'Playfair Display, Georgia, serif', fontWeight: 700, fontSize: '1.5rem', color: similarityScores[selectedIdx] >= 90 ? '#3A6B3A' : '#C97B63' }}>
                 {similarityScores[selectedIdx]}% match

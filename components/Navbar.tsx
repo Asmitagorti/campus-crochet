@@ -32,8 +32,8 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
   if (['admin', 'add-product', 'past-creations'].includes(page)) return null
 
   const navLinks: { label: string; target: Page }[] = [
-    { label: 'Home', target: 'home' },
     { label: 'Collection', target: 'catalog' },
+    { label: 'AI Assistant', target: 'ai-assistant' },
     { label: 'About', target: 'about' },
   ]
 
@@ -50,14 +50,11 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
         </button>
 
         {/* Desktop nav links */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }}>
+        <nav className="desktop-nav-links" style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }}>
           {navLinks.map(l => (
             <button
               key={l.target}
-              onClick={() => {{
-                 console.log("🚀 NAVIGATE CALLED:", l.target)
-                 navigate(l.target)}
-              }}
+              onClick={() => navigate(l.target)}
               style={{ color: page === l.target ? '#C97B63' : '#7A6058', fontWeight: page === l.target ? 600 : 400, fontSize: '0.88rem', background: 'none', border: 'none', cursor: 'pointer', borderBottom: page === l.target ? '1.5px solid #C97B63' : '1.5px solid transparent', paddingBottom: '2px', transition: 'all 0.15s' }}
             >
               {l.label}
@@ -94,11 +91,9 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
                       </div>
                       <div>
                         <p style={{ fontWeight: 600, color: '#2E1D15', fontSize: '0.88rem' }}>{user.name}</p>
-                        {user.college && (
-  <p style={{ color: '#7A6058', fontSize: '0.72rem', marginTop: 1 }}>
-    {user.college}
-  </p>
-)}
+                        {/* {user.rollNumber && (
+                          <p style={{ color: '#7A6058', fontSize: '0.72rem', marginTop: 1 }}>{user.rollNumber} · {user.college}</p>
+                        )} */}
                         <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '0.12rem 0.45rem', borderRadius: 50, backgroundColor: user.role === 'admin' ? '#2E1D15' : '#EDD4D4', color: user.role === 'admin' ? '#D8A7A7' : '#8B4A3A', display: 'inline-block', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                           {user.role}
                         </span>
@@ -111,6 +106,7 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
                     {user.role === 'admin' && (
                       <DropdownItem icon={<AdminIcon />} label="Admin Panel" onClick={() => { navigate('admin'); setProfileOpen(false) }} />
                     )}
+                    <DropdownItem icon={<AIAssistantIcon />} label="AI Assistant" onClick={() => { navigate('ai-assistant'); setProfileOpen(false) }} />
                     <DropdownItem icon={<OrdersIcon />} label="My Orders" onClick={() => { navigate('dashboard'); setProfileOpen(false) }} />
                     <DropdownItem icon={<CartIcon />} label="My Cart" badge={cartCount > 0 ? cartCount : undefined} onClick={() => { navigate('cart'); setProfileOpen(false) }} />
                     <div style={{ borderTop: '1px solid #EDD4D4', margin: '0.4rem 0' }} />
@@ -130,14 +126,42 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
             </button>
           )}
 
-          {/* Mobile menu */}
-          <button onClick={() => setMenuOpen(v => !v)} style={{ marginLeft: '0.25rem', padding: '0.45rem', color: '#7A6058', background: 'none', border: 'none', cursor: 'pointer', display: 'none' }} className="mobile-menu-btn">
+          {/* Mobile menu toggle */}
+          <button onClick={() => setMenuOpen(v => !v)} style={{ marginLeft: '0.25rem', padding: '0.45rem', color: '#7A6058', background: 'none', border: 'none', cursor: 'pointer' }} className="mobile-menu-btn" aria-label="Toggle menu">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               {menuOpen ? <><path d="M18 6L6 18"/><path d="M6 6l12 12"/></> : <><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></>}
             </svg>
           </button>
         </div>
       </div>
+
+      {/* Mobile nav drawer */}
+      <nav className={`mobile-nav-links${menuOpen ? ' open' : ''}`}>
+        {navLinks.map(l => (
+          <button
+            key={l.target}
+            onClick={() => { navigate(l.target); setMenuOpen(false) }}
+          >
+            {l.label}
+          </button>
+        ))}
+        {!user && (
+          <button onClick={() => { onLoginClick(); setMenuOpen(false) }}>
+            Sign in
+          </button>
+        )}
+        {user && (
+          <>
+            <button onClick={() => { navigate('ai-assistant'); setMenuOpen(false) }}>AI Assistant</button>
+            <button onClick={() => { navigate('dashboard'); setMenuOpen(false) }}>My Orders</button>
+            <button onClick={() => { navigate('cart'); setMenuOpen(false) }}>My Cart {cartCount > 0 ? `(${cartCount})` : ''}</button>
+            {user.role === 'admin' && (
+              <button onClick={() => { navigate('admin'); setMenuOpen(false) }}>Admin Panel</button>
+            )}
+            <button onClick={() => { onLogout(); setMenuOpen(false) }}>Sign out</button>
+          </>
+        )}
+      </nav>
 
       <style>{`@keyframes fadeIn { from { opacity:0; transform: translateY(-4px) } to { opacity:1; transform: translateY(0) } }`}</style>
     </header>
@@ -162,6 +186,7 @@ function DropdownItem({ icon, label, onClick, badge, danger }: { icon: React.Rea
 }
 
 function AdminIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> }
+function AIAssistantIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg> }
 function OrdersIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg> }
 function CartIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg> }
 function LogoutIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> }

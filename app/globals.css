@@ -46,3 +46,41 @@ body {
 
 .font-display { font-family: 'Playfair Display', Georgia, serif; }
 .font-hand { font-family: 'Caveat', cursive; }
+
+/* ── Navbar responsive ───────────────────────────────────────────── */
+.mobile-menu-btn {
+  display: none !important;
+}
+.mobile-nav-links {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .desktop-nav-links {
+    display: none !important;
+  }
+  .mobile-menu-btn {
+    display: inline-flex !important;
+  }
+  .mobile-nav-links.open {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #EDD4D4;
+    background-color: #FFFDF8;
+  }
+  .mobile-nav-links.open button {
+    text-align: left;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid #F7F3EC;
+    color: #2E1D15;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    font: inherit;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+}
