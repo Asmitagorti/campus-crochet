@@ -12,7 +12,7 @@ export type Page =
   | 'ai-assistant';
 
 export type AuthUser = {
-  id?: string;
+  id: string;
   username?: string;
   email: string;
   role: 'admin' | 'student' | 'customer';

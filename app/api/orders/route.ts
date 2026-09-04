@@ -166,16 +166,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const user_id = body.user_id;
+  // Use the authenticated session ID as the user ID — never trust the client.
+  const user_id = session.id;
   const items = body.items;
   const razorpay_order_id = body.razorpay_order_id;
 
-  if (typeof user_id !== "string" || !Array.isArray(items) || items.length === 0) {
+  if (!Array.isArray(items) || items.length === 0) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  if (user_id !== session.id && !isAdmin(session)) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const normalized: IncomingItem[] = [];

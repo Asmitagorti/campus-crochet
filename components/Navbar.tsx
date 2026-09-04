@@ -76,9 +76,9 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
               <button
                 onClick={() => setProfileOpen(v => !v)}
                 style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: '#F7F3EC', border: '1.5px solid #EDD4D4', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Playfair Display, Georgia, serif', fontWeight: 700, fontSize: '0.85rem', color: '#C97B63' }}
-                title={user.name}
+                title={user.name || '?'}
               >
-                {user.name[0].toUpperCase()}
+                {(user.name?.[0] ?? '?').toUpperCase()}
               </button>
 
               {profileOpen && (
@@ -87,7 +87,7 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
                   <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #EDD4D4', backgroundColor: '#F7F3EC' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                       <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: '#EDD4D4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Playfair Display, Georgia, serif', fontWeight: 700, fontSize: '0.95rem', color: '#C97B63', flexShrink: 0 }}>
-                        {user.name[0].toUpperCase()}
+                        {(user.name?.[0] ?? '?').toUpperCase()}
                       </div>
                       <div>
                         <p style={{ fontWeight: 600, color: '#2E1D15', fontSize: '0.88rem' }}>{user.name}</p>

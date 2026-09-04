@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: 60 * 60, // 1 hour — matches Supabase access-token JWT expiry
     });
 
     return NextResponse.json({ ok: true, user: { id: user.id, email: user.email ?? "" } });
