@@ -42,9 +42,11 @@ function normalize(row: DbRow) {
 
   return {
     id: row.product_id,
+    product_id: row.product_id,
     name: row.name,
     price: Number(row.price),
     category: row.category,
+    colors: colorNames,
     description: row.full_description ?? row.short_description ?? "",
     short_description: row.short_description ?? null,
     image: primaryImage,

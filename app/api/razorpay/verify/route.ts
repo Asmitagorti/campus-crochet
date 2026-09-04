@@ -1,5 +1,5 @@
-import { createHmac } from "crypto";
-import { supabase } from "@/lib/supabase";
+import { createHmac, timingSafeEqual } from "crypto";
+import { supabase, getServiceRoleClient } from "@/lib/supabase";
 import { getSession } from "@/lib/auth";
 
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
@@ -33,14 +33,18 @@ export async function POST(request: Request) {
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
 
-  if (generatedSignature !== razorpay_signature) {
+  const sigBuf = Buffer.from(razorpay_signature, "utf-8");
+  const genBuf = Buffer.from(generatedSignature, "utf-8");
+
+  if (sigBuf.length !== genBuf.length || !timingSafeEqual(sigBuf, genBuf)) {
     console.error("RAZORPAY SIGNATURE MISMATCH");
     return Response.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const { data: order, error: orderErr } = await supabase
+  const db = getServiceRoleClient();
+  const { data: order, error: orderErr } = await db
     .from("orders")
-    .select("order_id, user_id, payment_status")
+    .select("order_id, user_id, payment_status, razorpay_order_id")
     .eq("order_id", order_id)
     .maybeSingle();
 
@@ -55,11 +59,18 @@ export async function POST(request: Request) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  if (order.razorpay_order_id && order.razorpay_order_id !== razorpay_order_id) {
+    return Response.json(
+      { error: "razorpay_order_id mismatch" },
+      { status: 400 }
+    );
+  }
+
   if (order.payment_status === "captured") {
     return Response.json({ success: true, message: "Payment already verified" });
   }
 
-  const { error } = await supabase
+  const { error } = await db
     .from("orders")
     .update({
       payment_status: "captured",

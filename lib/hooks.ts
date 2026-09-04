@@ -21,23 +21,29 @@ type DbProduct = {
   product_colors?: DbProductColor[] | null;
 };
 
-function toClientProduct(row: DbProduct): Product {
-  const primaryImage = (row.product_images ?? [])
-    .slice()
-    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0]?.image_url ?? "";
+function toClientProduct(row: DbProduct & { id?: string; colors?: string[]; image?: string; description?: string }): Product {
+  const id = row.product_id ?? row.id ?? "";
+  const primaryImage =
+    (row.product_images ?? [])
+      .slice()
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0]?.image_url ??
+    row.image ??
+    "";
 
-  const colorNames = (row.product_colors ?? []).map((c) => c.color_name);
+  const colorNames =
+    row.colors ??
+    (row.product_colors ?? []).map((c) => (typeof c === "string" ? c : c.color_name));
   const days = row.processing_time_days ?? null;
   const processingTime = days ? `${days}-${days + 2} working days` : undefined;
 
   return {
-    id: row.product_id,
+    id,
     name: row.name,
     price: Number(row.price),
     category: row.category,
     colors: colorNames,
     image: primaryImage,
-    description: row.full_description ?? row.short_description ?? "",
+    description: row.full_description ?? row.short_description ?? row.description ?? "",
     short_description: row.short_description ?? undefined,
     stock: row.stock_quantity ?? undefined,
     is_available: row.is_available ?? false,
@@ -167,14 +173,16 @@ export function useOrdersForUser(userId: string | null | undefined) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userId) {
-      setOrders([]);
-      setLoading(false);
-      return;
-    }
     let mounted = true;
 
     async function load() {
+      if (!userId) {
+        if (mounted) {
+          setOrders([]);
+          setLoading(false);
+        }
+        return;
+      }
       setLoading(true);
       try {
         const res = await fetch(`/api/orders?user_id=${userId}`);

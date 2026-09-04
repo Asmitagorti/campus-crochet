@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = (await request.json().catch(() => ({}))) as { access_token?: unknown };
   const access_token =
     typeof body.access_token === "string" ? body.access_token : null;

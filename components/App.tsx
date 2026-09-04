@@ -41,8 +41,6 @@ const NO_FOOTER_PAGES: Page[] = [
 ];
 
 export default function App() {
-  console.log("❤️‍🔥 APP IS RUNNING");
-
   // ── Auth ─────────────────────────────────────────────────────────────────
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loginMode, setLoginMode] = useState<
@@ -59,9 +57,28 @@ export default function App() {
   const [page, setPage] = useState<Page>("home");
   const [pageData, setPageData] = useState<Record<string, string>>({});
 
-  // ── Cart ─────────────────────────────────────────────────────────────────
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [cartLoaded, setCartLoaded] = useState(false);
+  // ── Cart (localStorage) ──────────────────────────────────────────────────
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("campus_crochet_cart");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to load cart from localStorage", e);
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("campus_crochet_cart", JSON.stringify(cart));
+      } catch (e) {
+        console.error("Failed to save cart to localStorage", e);
+      }
+    }
+  }, [cart]);
 
   // ── Custom Order ─────────────────────────────────────────────────────────
   const [showCustomOrder, setShowCustomOrder] = useState(false);
@@ -79,13 +96,14 @@ export default function App() {
           session.user.email
         );
 
+        const metaName = session.user.user_metadata?.name?.trim();
+        const fallbackName = session.user.email ? session.user.email.split("@")[0] : "Student";
         const authUser: AuthUser = {
           id: session.user.id,
           email: session.user.email ?? "",
           role:
             session.user.user_metadata?.role ?? "customer",
-          name:
-            session.user.user_metadata?.name ?? "",
+          name: metaName || fallbackName || "Student",
         };
 
         setUser(authUser);
@@ -101,8 +119,6 @@ export default function App() {
       async (_event, session) => {
         if (!session?.user) {
           setUser(null);
-          setCart([]);
-          setCartLoaded(false);
 
           await fetch("/api/session", { method: "DELETE" }).catch(() => {});
 
@@ -120,13 +136,14 @@ export default function App() {
           }).catch(() => {});
         }
 
+        const metaName = session.user.user_metadata?.name?.trim();
+        const fallbackName = session.user.email ? session.user.email.split("@")[0] : "Student";
         const authUser: AuthUser = {
           id: session.user.id,
           email: session.user.email ?? "",
           role:
             session.user.user_metadata?.role ?? "customer",
-          name:
-            session.user.user_metadata?.name ?? "",
+          name: metaName || fallbackName || "Student",
         };
 
         setUser(authUser);
@@ -137,37 +154,6 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
-
-  // ── Load cart from Supabase when user logs in ────────────────────────────
-  useEffect(() => {
-    if (user?.id && !cartLoaded) {
-      loadCartFromSupabase();
-    } else if (!user) {
-      setCart([]);
-      setCartLoaded(false);
-    }
-  }, [user, cartLoaded]);
-
-  async function loadCartFromSupabase() {
-    if (!user?.id) return;
-    try {
-      const response = await fetch(`/api/cart?user_id=${user.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        const cartItems: CartItem[] = data.map((item: any) => ({
-          id: item.id,
-          productId: item.product_id,
-          color: item.color,
-          quantity: item.quantity,
-        }));
-        setCart(cartItems);
-      }
-    } catch (error) {
-      console.error("Failed to load cart:", error);
-    } finally {
-      setCartLoaded(true);
-    }
-  }
 
   // ── Scroll-triggered login toast ────────────────────────────────────────
   useEffect(() => {
@@ -257,8 +243,6 @@ export default function App() {
     await supabase.auth.signOut();
 
     setUser(null);
-    setCart([]);
-    setCartLoaded(false);
     setPage("home");
     setShowCustomOrder(false);
 
@@ -280,13 +264,12 @@ export default function App() {
     }
   }
 
-  // ── Cart (Supabase sync) ─────────────────────────────────────────────────
-  async function addToCart(
+  // ── Cart (localStorage backed) ───────────────────────────────────────────
+  function addToCart(
     productId: string,
     color: string,
     quantity = 1
   ) {
-    // Optimistic update
     setCart((prev) => {
       const existing = prev.find(
         (item) =>
@@ -300,7 +283,7 @@ export default function App() {
           item.color === color
             ? {
                 ...item,
-                quantity: item.quantity + quantity,
+                quantity: Math.min(item.quantity + quantity, 20),
               }
             : item
         );
@@ -311,26 +294,13 @@ export default function App() {
         {
           productId,
           color,
-          quantity,
+          quantity: Math.min(quantity, 20),
         },
       ];
     });
-
-    // Sync to Supabase
-    if (user?.id) {
-      try {
-        await fetch("/api/cart", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: user.id, product_id: productId, color, quantity }),
-        });
-      } catch (error) {
-        console.error("Failed to sync cart to Supabase:", error);
-      }
-    }
   }
 
-  async function updateCartQty(
+  function updateCartQty(
     productId: string,
     color: string,
     qty: number
@@ -340,41 +310,25 @@ export default function App() {
       return;
     }
 
+    const cappedQty = Math.min(qty, 20);
+
     setCart((prev) =>
       prev.map((item) =>
         item.productId === productId &&
         item.color === color
           ? {
               ...item,
-              quantity: qty,
+              quantity: cappedQty,
             }
           : item
       )
     );
-
-    // Sync to Supabase
-    if (user?.id) {
-      const item = cart.find(i => i.productId === productId && i.color === color);
-      if (item?.id) {
-        try {
-          await fetch("/api/cart", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cart_item_id: item.id, quantity: qty }),
-          });
-        } catch (error) {
-          console.error("Failed to update cart in Supabase:", error);
-        }
-      }
-    }
   }
 
-  async function removeFromCart(
+  function removeFromCart(
     productId: string,
     color: string
   ) {
-    const itemToRemove = cart.find(i => i.productId === productId && i.color === color);
-    
     setCart((prev) =>
       prev.filter(
         (item) =>
@@ -384,35 +338,9 @@ export default function App() {
           )
       )
     );
-
-    // Sync to Supabase
-    if (user?.id && itemToRemove?.id) {
-      try {
-        await fetch(`/api/cart?cart_item_id=${itemToRemove.id}&user_id=${user.id}`, {
-          method: "DELETE",
-        });
-      } catch (error) {
-        console.error("Failed to remove from cart in Supabase:", error);
-      }
-    }
   }
 
-  async function clearCart() {
-    if (user?.id && cart.length > 0) {
-      try {
-        await Promise.all(
-          cart
-            .filter((item) => !!item.id)
-            .map((item) =>
-              fetch(`/api/cart?cart_item_id=${item.id}&user_id=${user.id}`, {
-                method: "DELETE",
-              })
-            )
-        );
-      } catch (error) {
-        console.error("Failed to clear cart on server:", error);
-      }
-    }
+  function clearCart() {
     setCart([]);
   }
 

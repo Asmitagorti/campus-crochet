@@ -1,28 +1,28 @@
-﻿import type { Navigate, CartItem, AuthUser } from "@/types"
-import { YarnBall } from "../YarnDecor"
-import { useProducts } from "@/lib/hooks"
+import type { Navigate, CartItem, AuthUser } from "@/types";
+import { YarnBall } from "../YarnDecor";
+import { useProducts } from "@/lib/hooks";
 
 interface Props {
-  navigate: Navigate
-  cart: CartItem[]
-  onUpdateQty: (productId: string, color: string, qty: number) => void
-  onRemove: (productId: string, color: string) => void
-  user: AuthUser | null
-  onRequireLogin: () => void
+  navigate: Navigate;
+  cart: CartItem[];
+  onUpdateQty: (productId: string, color: string, qty: number) => void;
+  onRemove: (productId: string, color: string) => void;
+  user: AuthUser | null;
+  onRequireLogin: () => void;
 }
 
 export default function CartPage({ navigate, cart, onUpdateQty, onRemove, user, onRequireLogin }: Props) {
-  const { products, loading } = useProducts()
+  const { products, loading } = useProducts();
   const cartWithDetails = cart.map(item => ({
     ...item,
     product: products.find(p => p.id === item.productId),
-  })).filter(i => i.product)
+  })).filter(i => i.product);
 
-  const subtotal = cartWithDetails.reduce((sum, i) => sum + (i.product!.price * i.quantity), 0)
+  const subtotal = cartWithDetails.reduce((sum, i) => sum + (i.product!.price * i.quantity), 0);
 
   function handleCheckout() {
-    if (!user) { onRequireLogin(); return }
-    navigate('payment')
+    if (!user) { onRequireLogin(); return; }
+    navigate('payment');
   }
 
   if (cart.length === 0) {
@@ -35,16 +35,16 @@ export default function CartPage({ navigate, cart, onUpdateQty, onRemove, user, 
           Browse Collection
         </button>
       </main>
-    )
+    );
   }
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#FFFDF8' }}>
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 1.5rem' }}>
         <h1 style={{ fontFamily: 'Playfair Display, Georgia, serif', fontSize: '2rem', fontWeight: 700, color: '#2E1D15', marginBottom: '0.4rem' }}>Your Cart</h1>
-        <p style={{ color: '#7A6058', fontSize: '0.85rem', marginBottom: '2rem' }}>{cart.length} item{cart.length !== 1 ? 's' : ''} Â· all handmade to order</p>
+        <p style={{ color: '#7A6058', fontSize: '0.85rem', marginBottom: '2rem' }}>{cart.length} item{cart.length !== 1 ? 's' : ''} · all handmade to order</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '2rem', alignItems: 'start' }}>
+        <div className="cart-grid">
           {/* Items */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {cartWithDetails.map(item => (
@@ -67,17 +67,17 @@ export default function CartPage({ navigate, cart, onUpdateQty, onRemove, user, 
                   <p style={{ color: '#7A6058', fontSize: '0.78rem', marginBottom: '0.25rem' }}>{item.product!.category}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                     <span style={{ fontSize: '0.72rem', backgroundColor: '#EDD4D4', color: '#8B6B5C', padding: '0.15rem 0.5rem', borderRadius: 50 }}>{item.color}</span>
-                    <span style={{ fontSize: '0.72rem', color: '#A8B8A0' }}>Â· 3â€“5 working days</span>
+                    <span style={{ fontSize: '0.72rem', color: '#A8B8A0' }}>· 3–5 working days</span>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     {/* Qty */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 0, border: '1.5px solid #EDD4D4', borderRadius: 50, overflow: 'hidden' }}>
-                      <button onClick={() => onUpdateQty(item.productId, item.color, Math.max(1, item.quantity - 1))} style={{ padding: '0.3rem 0.75rem', background: 'none', border: 'none', cursor: 'pointer', color: '#7A6058', fontSize: '1rem' }}>âˆ’</button>
+                      <button onClick={() => onUpdateQty(item.productId, item.color, Math.max(1, item.quantity - 1))} style={{ padding: '0.3rem 0.75rem', background: 'none', border: 'none', cursor: 'pointer', color: '#7A6058', fontSize: '1rem' }}>−</button>
                       <span style={{ padding: '0 0.5rem', fontSize: '0.85rem', fontWeight: 600, color: '#2E1D15' }}>{item.quantity}</span>
-                      <button onClick={() => onUpdateQty(item.productId, item.color, item.quantity + 1)} style={{ padding: '0.3rem 0.75rem', background: 'none', border: 'none', cursor: 'pointer', color: '#7A6058', fontSize: '1rem' }}>+</button>
+                      <button onClick={() => onUpdateQty(item.productId, item.color, Math.min(20, item.quantity + 1))} style={{ padding: '0.3rem 0.75rem', background: 'none', border: 'none', cursor: 'pointer', color: '#7A6058', fontSize: '1rem' }}>+</button>
                     </div>
-                    <p style={{ fontWeight: 700, fontSize: '1.05rem', color: '#C97B63' }}>â‚¹{item.product!.price * item.quantity}</p>
+                    <p style={{ fontWeight: 700, fontSize: '1.05rem', color: '#C97B63' }}>₹{item.product!.price * item.quantity}</p>
                   </div>
                 </div>
               </div>
@@ -85,12 +85,12 @@ export default function CartPage({ navigate, cart, onUpdateQty, onRemove, user, 
 
             {/* Continue shopping */}
             <button onClick={() => navigate('catalog')} style={{ color: '#C97B63', fontSize: '0.85rem', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '0.25rem 0' }}>
-              â† Continue shopping
+              ← Continue shopping
             </button>
           </div>
 
           {/* Order summary */}
-          <div style={{ position: 'sticky', top: 80 }}>
+          <div>
             <div style={{ backgroundColor: '#F7F3EC', borderRadius: 20, border: '1px solid #EDD4D4', overflow: 'hidden' }}>
               <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #EDD4D4' }}>
                 <h3 style={{ fontWeight: 700, color: '#2E1D15', fontSize: '1rem' }}>Order Summary</h3>
@@ -100,8 +100,8 @@ export default function CartPage({ navigate, cart, onUpdateQty, onRemove, user, 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #EDD4D4' }}>
                   {cartWithDetails.map(i => (
                     <div key={`${i.productId}-${i.color}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                      <span style={{ color: '#7A6058' }}>{i.product!.name} Ã— {i.quantity}</span>
-                      <span style={{ color: '#2E1D15', fontWeight: 500 }}>â‚¹{i.product!.price * i.quantity}</span>
+                      <span style={{ color: '#7A6058' }}>{i.product!.name} × {i.quantity}</span>
+                      <span style={{ color: '#2E1D15', fontWeight: 500 }}>₹{i.product!.price * i.quantity}</span>
                     </div>
                   ))}
                 </div>
@@ -109,15 +109,15 @@ export default function CartPage({ navigate, cart, onUpdateQty, onRemove, user, 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span style={{ color: '#7A6058' }}>Subtotal</span>
-                    <span style={{ color: '#2E1D15' }}>â‚¹{subtotal}</span>
+                    <span style={{ color: '#2E1D15' }}>₹{subtotal}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span style={{ color: '#A8B8A0' }}>Delivery</span>
-                    <span style={{ color: '#A8B8A0' }}>â‚¹0 Â· campus pickup</span>
+                    <span style={{ color: '#A8B8A0' }}>₹0 · campus pickup</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.6rem', borderTop: '1px solid #EDD4D4', marginTop: '0.25rem' }}>
                     <span style={{ fontWeight: 700, color: '#2E1D15', fontSize: '0.95rem' }}>Total</span>
-                    <span style={{ fontWeight: 700, color: '#C97B63', fontSize: '1.15rem' }}>â‚¹{subtotal}</span>
+                    <span style={{ fontWeight: 700, color: '#C97B63', fontSize: '1.15rem' }}>₹{subtotal}</span>
                   </div>
                 </div>
 
@@ -127,7 +127,7 @@ export default function CartPage({ navigate, cart, onUpdateQty, onRemove, user, 
                   onMouseEnter={e => e.currentTarget.style.backgroundColor = '#A86248'}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = '#C97B63'}
                 >
-                  Proceed to Checkout â†’
+                  Proceed to Checkout →
                 </button>
 
                 <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
@@ -140,12 +140,25 @@ export default function CartPage({ navigate, cart, onUpdateQty, onRemove, user, 
             {/* Info note */}
             <div style={{ backgroundColor: '#F7F3EC', borderRadius: 14, padding: '0.85rem 1rem', border: '1px solid #EDD4D4', marginTop: '0.75rem' }}>
               <p style={{ color: '#7A6058', fontSize: '0.75rem', lineHeight: 1.6 }}>
-                ðŸ§¶ Each item is made fresh after your order. Campus pickup only â€” no delivery charges, no shipping.
+                🧶 Each item is made fresh after your order. Campus pickup only — no delivery charges, no shipping.
               </p>
             </div>
           </div>
         </div>
       </div>
+      <style>{`
+        .cart-grid {
+          display: grid;
+          grid-template-columns: 1fr 340px;
+          gap: 2rem;
+          align-items: start;
+        }
+        @media (max-width: 768px) {
+          .cart-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </main>
-  )
+  );
 }

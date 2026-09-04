@@ -1,25 +1,25 @@
-﻿import { useState, useRef, useEffect } from 'react'
-import type { Navigate, CartItem, AuthUser } from "@/types"
-import { CheckShieldIcon, CrochetFlower } from "../YarnDecor"
-import { useProducts } from "@/lib/hooks"
+import { useState, useRef, useEffect } from 'react';
+import type { Navigate, CartItem, AuthUser } from "@/types";
+import { CheckShieldIcon, CrochetFlower } from "../YarnDecor";
+import { useProducts } from "@/lib/hooks";
 
 interface Props {
-  navigate: Navigate
-  cart: CartItem[]
-  user: AuthUser | null
-  onClearCart: () => void
-  onRequireLogin?: () => void
+  navigate: Navigate;
+  cart: CartItem[];
+  user: AuthUser | null;
+  onClearCart: () => void;
+  onRequireLogin?: () => void;
 }
 
-type Step = 'review' | 'pay' | 'done'
+type Step = 'review' | 'pay' | 'done';
 
 function StepBar({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
     { key: 'review', label: 'Review Order' },
     { key: 'pay', label: 'Payment' },
     { key: 'done', label: 'Confirmed' },
-  ]
-  const idx = steps.findIndex(s => s.key === current)
+  ];
+  const idx = steps.findIndex(s => s.key === current);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: '2.5rem', justifyContent: 'center' }}>
       {steps.map((s, i) => (
@@ -36,35 +36,38 @@ function StepBar({ current }: { current: Step }) {
         </div>
       ))}
     </div>
-  )
+  );
 }
 
 declare global {
   interface Window {
     Razorpay?: new (options: Record<string, unknown>) => {
-      open: () => void
-      on: (event: string, handler: (response: unknown) => void) => void
-    }
+      open: () => void;
+      on: (event: string, handler: (response: unknown) => void) => void;
+    };
   }
 }
 
 export default function PaymentPage({ navigate, cart, user, onClearCart, onRequireLogin }: Props) {
-  const [step, setStep] = useState<Step>('review')
-  const [payMethod, setPayMethod] = useState<'upi' | 'card' | 'netbanking'>('upi')
-  const [upiId, setUpiId] = useState('')
-  const [agreed, setAgreed] = useState(false)
-  const [paying, setPaying] = useState(false)
-  const [orderId, setOrderId] = useState<string | null>(null)
-  const [payError, setPayError] = useState<string | null>(null)
-  const cartClearedRef = useRef(false)
-  const { products } = useProducts()
+  const [step, setStep] = useState<Step>('review');
+  const [agreed, setAgreed] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [serverTotal, setServerTotal] = useState<number | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [payInfo, setPayInfo] = useState<string | null>(null);
+  
+  const isProceedingRef = useRef(false);
+  const isPayingRef = useRef(false);
+  const cartClearedRef = useRef(false);
+  const { products } = useProducts();
 
   useEffect(() => {
     if (step === 'done' && !cartClearedRef.current) {
-      cartClearedRef.current = true
-      onClearCart()
+      cartClearedRef.current = true;
+      onClearCart();
     }
-  }, [step, onClearCart])
+  }, [step, onClearCart]);
 
   if (!user) {
     return (
@@ -79,16 +82,22 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
           ← Back to cart
         </button>
       </main>
-    )
+    );
   }
 
-  const cartDetails = cart.map(item => ({ ...item, product: products.find(p => p.id === item.productId) })).filter(i => i.product)
-  const subtotal = cartDetails.reduce((s, i) => s + i.product!.price * i.quantity, 0)
+  const cartDetails = cart.map(item => ({ ...item, product: products.find(p => p.id === item.productId) })).filter(i => i.product);
+  const subtotal = cartDetails.reduce((s, i) => s + i.product!.price * i.quantity, 0);
+  const effectiveTotal = serverTotal ?? subtotal;
 
   async function proceedToPayment() {
-    if (!user?.id || cartDetails.length === 0) return
-    setPaying(true)
-    setPayError(null)
+    if (!user?.id || cartDetails.length === 0) return;
+    if (isProceedingRef.current || paying) return;
+
+    isProceedingRef.current = true;
+    setPaying(true);
+    setPayError(null);
+    setPayInfo(null);
+
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -102,68 +111,78 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
             price: i.product!.price,
           })),
         }),
-      })
+      });
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Order creation failed: ${res.status}`)
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Order creation failed: ${res.status}`);
       }
-      const data = await res.json()
-      setOrderId(data.order.id)
-      setStep('pay')
+
+      const data = await res.json();
+      setOrderId(data.order.id);
+      if (typeof data.server_total === 'number') {
+        setServerTotal(data.server_total);
+      }
+      setStep('pay');
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Failed to create order.'
-      console.error('proceedToPayment error:', e)
-      setPayError(message)
+      const message = e instanceof Error ? e.message : 'Failed to create order.';
+      console.error('proceedToPayment error:', e);
+      setPayError(message);
     } finally {
-      setPaying(false)
+      setPaying(false);
+      isProceedingRef.current = false;
     }
   }
 
   async function loadRazorpayScript(): Promise<boolean> {
-    if (typeof window === 'undefined') return false
-    if (window.Razorpay) return true
+    if (typeof window === 'undefined') return false;
+    if (window.Razorpay) return true;
     return new Promise((resolve) => {
-      const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay]')
+      const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay]');
       if (existing) {
-        existing.addEventListener('load', () => resolve(!!window.Razorpay))
-        existing.addEventListener('error', () => resolve(false))
-        return
+        existing.addEventListener('load', () => resolve(!!window.Razorpay));
+        existing.addEventListener('error', () => resolve(false));
+        return;
       }
-      const script = document.createElement('script')
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-      script.async = true
-      script.dataset.razorpay = 'true'
-      script.onload = () => resolve(!!window.Razorpay)
-      script.onerror = () => resolve(false)
-      document.head.appendChild(script)
-    })
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.dataset.razorpay = 'true';
+      script.onload = () => resolve(!!window.Razorpay);
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
   }
 
   async function handlePay() {
-    if (!agreed || !orderId || paying) return
-    const currentUser = user
-    if (!currentUser) return
-    setPaying(true)
-    setPayError(null)
+    if (!agreed || !orderId || paying || isPayingRef.current) return;
+    const currentUser = user;
+    if (!currentUser) return;
+
+    isPayingRef.current = true;
+    setPaying(true);
+    setPayError(null);
+    setPayInfo(null);
+
     try {
       const rzCreate = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: subtotal,
+          amount: effectiveTotal,
           currency: 'INR',
           receipt: `order_${orderId}`,
           notes: { order_id: orderId },
         }),
-      })
+      });
 
       if (!rzCreate.ok) {
-        const err = await rzCreate.json().catch(() => ({}))
-        throw new Error(err.error ?? `Payment init failed: ${rzCreate.status}`)
+        const err = await rzCreate.json().catch(() => ({}));
+        throw new Error(err.error ?? `Payment init failed: ${rzCreate.status}`);
       }
 
-      const rz = await rzCreate.json()
-      const scriptReady = await loadRazorpayScript()
+      const rz = await rzCreate.json();
+      const scriptReady = await loadRazorpayScript();
 
       if (scriptReady && window.Razorpay) {
         await new Promise<void>((resolve, reject) => {
@@ -176,9 +195,9 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
               description: `Order ${orderId}`,
               order_id: rz.order_id,
               handler: async (response: {
-                razorpay_order_id: string
-                razorpay_payment_id: string
-                razorpay_signature: string
+                razorpay_order_id: string;
+                razorpay_payment_id: string;
+                razorpay_signature: string;
               }) => {
                 const verifyRes = await fetch('/api/razorpay/verify', {
                   method: 'POST',
@@ -189,14 +208,14 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
                     razorpay_signature: response.razorpay_signature,
                     order_id: orderId,
                   }),
-                })
+                });
                 if (!verifyRes.ok) {
-                  const err = await verifyRes.json().catch(() => ({}))
-                  reject(new Error(err.error ?? 'Verification failed'))
-                  return
+                  const err = await verifyRes.json().catch(() => ({}));
+                  reject(new Error(err.error ?? 'Verification failed'));
+                  return;
                 }
-                setStep('done')
-                resolve()
+                setStep('done');
+                resolve();
               },
               prefill: {
                 name: currentUser.name,
@@ -205,29 +224,34 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
               theme: { color: '#C97B63' },
               modal: {
                 ondismiss: () => {
-                  reject(new Error('Payment cancelled'))
+                  reject(new Error('Payment cancelled by user'));
                 },
               },
-            }
-            const rzp = new window.Razorpay!(options)
+            };
+            const rzp = new window.Razorpay!(options);
             rzp.on('payment.failed', (resp: unknown) => {
-              const description = (resp as { error?: { description?: string } } | undefined)?.error?.description
-              reject(new Error(description ?? 'Payment failed'))
-            })
-            rzp.open()
+              const description = (resp as { error?: { description?: string } } | undefined)?.error?.description;
+              reject(new Error(description ?? 'Payment failed'));
+            });
+            rzp.open();
           } catch (openErr) {
-            reject(openErr instanceof Error ? openErr : new Error('Could not open checkout'))
+            reject(openErr instanceof Error ? openErr : new Error('Could not open checkout'));
           }
-        })
+        });
       } else {
-        throw new Error('Payment gateway is unavailable. Please contact the maker to complete your order.')
+        throw new Error('Payment gateway is unavailable. Please try again later.');
       }
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Payment failed.'
-      console.error('handlePay error:', e)
-      setPayError(message)
+      const message = e instanceof Error ? e.message : 'Payment failed.';
+      console.error('handlePay error:', e);
+      if (message.includes('cancelled')) {
+        setPayInfo('Payment was cancelled. You can try paying again whenever you\'re ready.');
+      } else {
+        setPayError(message);
+      }
     } finally {
-      setPaying(false)
+      setPaying(false);
+      isPayingRef.current = false;
     }
   }
 
@@ -259,7 +283,7 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
           @keyframes bloom { from { opacity: 0; transform: scale(0) } to { opacity: 1; transform: scale(1) } }
         `}</style>
       </main>
-    )
+    );
   }
 
   return (
@@ -306,7 +330,7 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
               <div style={{ padding: '1.25rem 1.5rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#7A6058' }}><span>Subtotal</span><span>₹{subtotal}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#A8B8A0' }}><span>Delivery</span><span>₹0 · cash on pickup</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#A8B8A0' }}><span>Delivery</span><span>₹0 · campus pickup</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid #EDD4D4', marginTop: '0.25rem' }}>
                     <span style={{ fontWeight: 700, color: '#2E1D15' }}>Total</span>
                     <span style={{ fontWeight: 700, color: '#C97B63', fontSize: '1.2rem' }}>₹{subtotal}</span>
@@ -332,7 +356,7 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
                 {[
                   { label: 'Ordered', value: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), icon: '📅' },
                   { label: 'Processing', value: '3–5 working days', icon: '🪡' },
-                  { label: 'Est. Ready', value: (() => { const d = new Date(); let days = 5; while (days > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) days-- } return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) })(), icon: '📦' },
+                  { label: 'Est. Ready', value: (() => { const d = new Date(); let days = 5; while (days > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) days--; } return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); })(), icon: '📦' },
                 ].map(t => (
                   <div key={t.label} style={{ textAlign: 'center', backgroundColor: '#FFFDF8', borderRadius: 12, padding: '0.75rem 0.5rem', border: '1px solid #EDD4D4' }}>
                     <div style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>{t.icon}</div>
@@ -341,7 +365,7 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
                   </div>
                 ))}
               </div>
-              <p style={{ color: '#A8B8A0', fontSize: '0.72rem', marginTop: '0.6rem', textAlign: 'center' }}>Cash on pickup · no delivery · we&apos;ll message you when it&apos;s ready</p>
+              <p style={{ color: '#A8B8A0', fontSize: '0.72rem', marginTop: '0.6rem', textAlign: 'center' }}>Campus pickup · no delivery charges · we&apos;ll message you when it&apos;s ready</p>
             </div>
 
             <div style={{ backgroundColor: '#2E1D15', borderRadius: 16, padding: '1.1rem 1.25rem', marginBottom: '1.5rem' }}>
@@ -372,62 +396,43 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
                   <svg width="16" height="16" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="6" fill="#2D81F7"/><path d="M20 8l-8 8 4 2-6 6h12V16l-4-2 6-6z" fill="#fff" opacity="0.9"/></svg>
                   <span style={{ fontWeight: 700, color: '#2D81F7', fontSize: '0.82rem' }}>Razorpay</span>
                 </div>
-                <span style={{ color: '#7A6058', fontSize: '0.78rem' }}>Secure Payment · 256-bit SSL</span>
+                <span style={{ color: '#7A6058', fontSize: '0.78rem' }}>Secure Payment Gateway · 256-bit SSL</span>
               </div>
 
-              <div style={{ backgroundColor: '#FFFDF8', borderRadius: 12, padding: '0.85rem 1rem', border: '1px solid #EDD4D4', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#7A6058', fontSize: '0.85rem' }}>Amount to pay</span>
-                <span style={{ fontWeight: 700, color: '#C97B63', fontSize: '1.2rem' }}>₹{subtotal}</span>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem' }}>
-                {(['upi', 'card', 'netbanking'] as const).map(m => (
-                  <button key={m} onClick={() => setPayMethod(m)} style={{ padding: '0.4rem 1rem', borderRadius: 50, fontSize: '0.78rem', fontWeight: 600, border: payMethod === m ? '2px solid #2D81F7' : '1.5px solid #EDD4D4', backgroundColor: payMethod === m ? 'rgba(45,11,247,0.08)' : '#FFFDF8', color: payMethod === m ? '#2D81F7' : '#7A6058', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {m === 'netbanking' ? 'Net Banking' : m.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-
-              {payMethod === 'upi' && (
+              <div style={{ backgroundColor: '#FFFDF8', borderRadius: 12, padding: '1rem 1.25rem', border: '1px solid #EDD4D4', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <label style={labelSt}>UPI ID</label>
-                  <input type="text" value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="yourname@upi" style={{ ...inSt, marginBottom: '0.75rem' }} onFocus={e => e.target.style.borderColor = '#2D81F7'} onBlur={e => e.target.style.borderColor = '#EDD4D4'} />
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {['GPay', 'PhonePe', 'Paytm', 'BHIM'].map(a => (
-                      <div key={a} style={{ padding: '0.3rem 0.8rem', borderRadius: 8, border: '1px solid #EDD4D4', backgroundColor: '#FFFDF8', fontSize: '0.75rem', color: '#7A6058', cursor: 'pointer' }}>{a}</div>
-                    ))}
-                  </div>
+                  <span style={{ color: '#7A6058', fontSize: '0.82rem', display: 'block' }}>Amount to pay</span>
+                  <span style={{ color: '#A8B8A0', fontSize: '0.72rem' }}>Order #{orderId}</span>
                 </div>
-              )}
+                <span style={{ fontWeight: 700, color: '#C97B63', fontSize: '1.3rem' }}>₹{effectiveTotal}</span>
+              </div>
 
-              {payMethod === 'card' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <input placeholder="Card number" style={inSt} onFocus={e => e.target.style.borderColor = '#2D81F7'} onBlur={e => e.target.style.borderColor = '#EDD4D4'} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                    <input placeholder="MM / YY" style={inSt} onFocus={e => e.target.style.borderColor = '#2D81F7'} onBlur={e => e.target.style.borderColor = '#EDD4D4'} />
-                    <input placeholder="CVV" style={inSt} onFocus={e => e.target.style.borderColor = '#2D81F7'} onBlur={e => e.target.style.borderColor = '#EDD4D4'} />
-                  </div>
-                  <input placeholder="Cardholder name" style={inSt} onFocus={e => e.target.style.borderColor = '#2D81F7'} onBlur={e => e.target.style.borderColor = '#EDD4D4'} />
+              <div style={{ backgroundColor: '#FFFDF8', borderRadius: 12, padding: '1.25rem', border: '1px solid #EDD4D4', marginBottom: '1.25rem', textAlign: 'center' }}>
+                <p style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2E1D15', marginBottom: '0.4rem' }}>
+                  Ready to pay via Razorpay
+                </p>
+                <p style={{ color: '#7A6058', fontSize: '0.8rem', lineHeight: 1.5, marginBottom: '0.85rem' }}>
+                  Click the button below to open Razorpay's secure checkout window. You can choose from <strong>UPI (GPay, PhonePe, Paytm, BHIM)</strong>, <strong>Debit/Credit Cards</strong>, or <strong>Net Banking</strong>.
+                </p>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {['UPI (GPay/PhonePe)', 'Cards (Visa/Mastercard/RuPay)', 'Net Banking'].map(option => (
+                    <span key={option} style={{ fontSize: '0.72rem', backgroundColor: '#F7F3EC', color: '#7A6058', padding: '0.25rem 0.65rem', borderRadius: 50, border: '1px solid #EDD4D4' }}>
+                      ✓ {option}
+                    </span>
+                  ))}
                 </div>
-              )}
+              </div>
 
-              {payMethod === 'netbanking' && (
-                <select style={inSt}>
-                  <option>Select bank</option>
-                  {['SBI', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'Bank of Baroda'].map(b => <option key={b}>{b}</option>)}
-                </select>
-              )}
-
-              <p style={{ color: '#7A6058', fontSize: '0.73rem', marginTop: '1rem', lineHeight: 1.5 }}>
-                🔒 Campus Crochet does not store your card or UPI details. All payments are processed by Razorpay.
+              <p style={{ color: '#7A6058', fontSize: '0.73rem', textAlign: 'center', lineHeight: 1.5 }}>
+                🔒 Campus Crochet does not store your payment credentials. All transactions are securely processed by Razorpay.
               </p>
             </div>
 
             <div style={{ backgroundColor: '#F7F3EC', borderRadius: 16, border: '1px solid #EDD4D4', padding: '1rem 1.25rem', marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
               <span style={{ fontSize: '1.25rem' }}>📱</span>
               <div>
-                <p style={{ fontWeight: 600, color: '#2E1D15', fontSize: '0.88rem', marginBottom: 2 }}>Pickup OTP</p>
-                <p style={{ color: '#7A6058', fontSize: '0.76rem', lineHeight: 1.6 }}>A one-time code will be generated after your order is ready. Show it during campus pickup to confirm handover.</p>
+                <p style={{ fontWeight: 600, color: '#2E1D15', fontSize: '0.88rem', marginBottom: 2 }}>Campus Pickup Notice</p>
+                <p style={{ color: '#7A6058', fontSize: '0.76rem', lineHeight: 1.6 }}>Show your order confirmation on campus when your item is ready to collect. Orders are prepared fresh after payment.</p>
               </div>
             </div>
 
@@ -441,14 +446,22 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
             <button
               onClick={handlePay}
               disabled={paying || !agreed}
-              style={{ width: '100%', backgroundColor: !agreed ? '#EDD4D4' : '#C97B63', color: !agreed ? '#B88080' : '#FFFDF8', fontWeight: 700, padding: '0.9rem', borderRadius: 50, border: 'none', cursor: !agreed ? 'not-allowed' : 'pointer', fontSize: '0.95rem', boxShadow: agreed ? '0 4px 16px rgba(201,123,99,0.3)' : 'none', transition: 'all 0.2s', marginBottom: '0.75rem' }}
+              style={{ width: '100%', backgroundColor: !agreed || paying ? '#EDD4D4' : '#C97B63', color: !agreed || paying ? '#B88080' : '#FFFDF8', fontWeight: 700, padding: '0.9rem', borderRadius: 50, border: 'none', cursor: !agreed || paying ? 'not-allowed' : 'pointer', fontSize: '0.95rem', boxShadow: agreed && !paying ? '0 4px 16px rgba(201,123,99,0.3)' : 'none', transition: 'all 0.2s', marginBottom: '0.75rem' }}
             >
-              {paying ? '⏳ Opening Razorpay…' : `Pay ₹${subtotal} via Razorpay`}
+              {paying ? '⏳ Opening Razorpay…' : `Pay ₹${effectiveTotal} via Razorpay`}
             </button>
+
+            {payInfo && (
+              <div style={{ backgroundColor: '#F7F3EC', borderRadius: 12, padding: '0.75rem 1rem', border: '1px solid #EDD4D4', marginTop: '0.5rem', marginBottom: '0.5rem', textAlign: 'center' }}>
+                <p style={{ color: '#7A6058', fontSize: '0.82rem' }}>
+                  ℹ️ {payInfo}
+                </p>
+              </div>
+            )}
 
             {payError && (
               <p style={{ marginTop: '0.5rem', color: '#A86248', fontSize: '0.82rem', textAlign: 'center', marginBottom: '0.5rem' }}>
-                {payError}
+                ⚠️ {payError}
               </p>
             )}
 
@@ -459,8 +472,5 @@ export default function PaymentPage({ navigate, cart, user, onClearCart, onRequi
         )}
       </div>
     </main>
-  )
+  );
 }
-
-const labelSt: React.CSSProperties = { display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#2E1D15', marginBottom: '0.35rem' }
-const inSt: React.CSSProperties = { width: '100%', padding: '0.65rem 0.9rem', borderRadius: 12, border: '1.5px solid #EDD4D4', backgroundColor: '#FFFDF8', color: '#2E1D15', fontSize: '0.88rem', outline: 'none', fontFamily: 'DM Sans, system-ui, sans-serif', transition: 'border-color 0.2s' }

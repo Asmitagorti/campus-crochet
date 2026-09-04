@@ -59,11 +59,16 @@ export async function getSession(): Promise<SessionUser | null> {
         ? user.user_metadata.role
         : "customer";
 
+    const name =
+      user.user_metadata?.name?.trim() ||
+      user.email?.split("@")[0] ||
+      "Student";
+
     return {
       id: user.id,
       email: user.email ?? "",
       role,
-      name: user.user_metadata?.name ?? "",
+      name,
     };
   } catch {
     return null;

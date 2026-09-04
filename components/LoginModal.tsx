@@ -14,7 +14,7 @@ export const ALLOWED_DOMAINS = [
 
 const DEV_TEST_USERNAME = "puppy";
 const DEV_TEST_PASSWORD = "puppy";
-const DEV_TEST_LOGIN = true;
+const DEV_TEST_LOGIN = process.env.NODE_ENV !== "production";
 const ADMIN_EMAIL = "asmileis4evr@gmail.com";
 
 const COLLEGES = [

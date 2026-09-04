@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import type { Navigate, Product } from "@/types";
@@ -306,7 +306,7 @@ export default function ProductDetailPage({ navigate, productId, onAddToCart }: 
             <p
               style={{ fontWeight: 700, fontSize: "1.75rem", color: "#C97B63", marginBottom: "1.5rem" }}
             >
-              â‚¹{product.price}
+              ₹{product.price}
             </p>
 
             <p style={{ color: "#5A4238", lineHeight: 1.8, fontSize: "0.92rem", marginBottom: "1.75rem" }}>
@@ -361,13 +361,13 @@ export default function ProductDetailPage({ navigate, productId, onAddToCart }: 
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   style={{ padding: "0.4rem 0.9rem", fontSize: "1.1rem", color: "#7A6058", background: "none", border: "none", cursor: "pointer" }}
                 >
-                  âˆ’
+                  −
                 </button>
                 <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#2E1D15", minWidth: 20, textAlign: "center" }}>
                   {quantity}
                 </span>
                 <button
-                  onClick={() => setQuantity(quantity + 1)}
+                  onClick={() => setQuantity(Math.min(20, quantity + 1))}
                   style={{ padding: "0.4rem 0.9rem", fontSize: "1.1rem", color: "#7A6058", background: "none", border: "none", cursor: "pointer" }}
                 >
                   +
@@ -391,7 +391,7 @@ export default function ProductDetailPage({ navigate, productId, onAddToCart }: 
                 <polyline points="12 6 12 12 16 14" />
               </svg>
               <p style={{ fontSize: "0.82rem", color: "#7A6058" }}>
-                Made after your order Â· <strong style={{ color: "#2E1D15" }}>3â€“5 working days</strong> processing time
+                Made after your order · <strong style={{ color: "#2E1D15" }}>3–5 working days</strong> processing time
               </p>
             </div>
 
@@ -533,7 +533,7 @@ export default function ProductDetailPage({ navigate, productId, onAddToCart }: 
                   </div>
                   <p style={{ fontWeight: 600, fontSize: "0.85rem", color: "#2E1D15" }}>{v.color}</p>
                   <p style={{ fontFamily: "Caveat, cursive", color: "#7A6058", fontSize: "0.9rem" }}>
-                    {v.college} Â· {v.date}
+                    {v.college} · {v.date}
                   </p>
                 </div>
               </div>
@@ -584,7 +584,7 @@ export default function ProductDetailPage({ navigate, productId, onAddToCart }: 
                     >
                       {p.name}
                     </p>
-                    <p style={{ color: "#C97B63", fontWeight: 700, marginTop: 4 }}>â‚¹{p.price}</p>
+                    <p style={{ color: "#C97B63", fontWeight: 700, marginTop: 4 }}>₹{p.price}</p>
                   </div>
                 </div>
               ))}

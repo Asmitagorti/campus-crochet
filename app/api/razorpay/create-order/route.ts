@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, getServiceRoleClient } from "@/lib/supabase";
 import { getSession, isAdmin } from "@/lib/auth";
 
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
@@ -71,9 +71,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "notes.order_id is required" }, { status: 400 });
   }
 
-  const { data: order, error: orderErr } = await supabase
+  const db = getServiceRoleClient();
+  const { data: order, error: orderErr } = await db
     .from("orders")
-    .select("order_id, user_id, total_price, payment_status")
+    .select("order_id, user_id, total_price, payment_status, created_at")
     .eq("order_id", orderId)
     .maybeSingle();
 
@@ -88,11 +89,30 @@ export async function POST(request: Request) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (order.payment_status !== "pending" && order.payment_status !== "captured") {
+  if (order.payment_status !== "pending") {
     return Response.json(
       { error: `Cannot create payment for order in payment_status '${order.payment_status}'` },
       { status: 400 }
     );
+  }
+
+  // 30-minute expiration check for unpaid pending orders
+  if (order.created_at) {
+    const createdAtMs = new Date(order.created_at).getTime();
+    if (Number.isFinite(createdAtMs) && Date.now() - createdAtMs > 30 * 60 * 1000) {
+      await db
+        .from("orders")
+        .update({
+          order_status: "cancelled",
+          payment_status: "failed",
+        })
+        .eq("order_id", orderId);
+
+      return Response.json(
+        { error: "Order has expired. Please create a new order." },
+        { status: 400 }
+      );
+    }
   }
 
   const expectedPaise = Math.round(Number(order.total_price) * 100);
@@ -111,7 +131,7 @@ export async function POST(request: Request) {
       notes,
     });
 
-    await supabase
+    await db
       .from("orders")
       .update({ razorpay_order_id: orderRes.id })
       .eq("order_id", orderId);

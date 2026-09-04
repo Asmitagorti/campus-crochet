@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Product, ProductWithImages } from "@/types";
+import type { Product } from "@/types";
 
 type DbProduct = {
   product_id: string;

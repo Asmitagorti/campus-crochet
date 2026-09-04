@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, getServiceRoleClient } from "@/lib/supabase";
 import { getSession, isAdmin } from "@/lib/auth";
 import type { Order, OrderItem, PaymentStatus, OrderLifecycleStatus } from "@/types";
 
@@ -36,7 +36,8 @@ export async function GET(request: Request) {
   }
   const effectiveUserId = isAdmin(session) ? userId || session.id : session.id;
 
-  let query = supabase
+  const db = getServiceRoleClient();
+  let query = db
     .from("orders")
     .select(`
       order_id,
@@ -199,8 +200,22 @@ export async function POST(request: Request) {
     normalized.push({ productId, color, quantity });
   }
 
+  const db = getServiceRoleClient();
+
+  // Cancel any old unpaid pending orders older than 30 minutes for this user
+  const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  await db
+    .from("orders")
+    .update({
+      order_status: "cancelled",
+      payment_status: "failed",
+    })
+    .eq("user_id", user_id)
+    .eq("payment_status", "pending")
+    .lt("created_at", thirtyMinsAgo);
+
   const productIds = Array.from(new Set(normalized.map((it) => it.productId)));
-  const { data: products, error: prodErr } = await supabase
+  const { data: products, error: prodErr } = await db
     .from("products")
     .select("product_id, price, is_available, stock_quantity")
     .in("product_id", productIds);
@@ -254,7 +269,7 @@ export async function POST(request: Request) {
     insertRow.razorpay_order_id = razorpay_order_id;
   }
 
-  const { data: order, error: orderError } = await supabase
+  const { data: order, error: orderError } = await db
     .from("orders")
     .insert(insertRow)
     .select()
@@ -278,11 +293,11 @@ export async function POST(request: Request) {
     price_at_purchase: priceMap.get(it.productId)!.price,
   }));
 
-  const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
+  const { error: itemsError } = await db.from("order_items").insert(orderItems);
 
   if (itemsError) {
     console.error("ORDER ITEMS INSERT ERROR:", itemsError);
-    await supabase.from("orders").delete().eq("order_id", orderId);
+    await db.from("orders").delete().eq("order_id", orderId);
     return Response.json({ error: itemsError.message }, { status: 500 });
   }
 
@@ -331,7 +346,8 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "No fields to update" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const db = getServiceRoleClient();
+  const { data, error } = await db
     .from("orders")
     .update(updateRow)
     .eq("order_id", order_id)
