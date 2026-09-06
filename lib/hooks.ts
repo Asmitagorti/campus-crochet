@@ -111,7 +111,8 @@ type DbOrderItemWithProduct = DbOrderItem & {
 };
 
 type DbOrder = {
-  order_id: string;
+  id?: string;
+  order_id?: string;
   user_id: string;
   razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
@@ -119,6 +120,7 @@ type DbOrder = {
   order_status: Order["order_status"] | string;
   payment_method: string | null;
   total_price: number | string;
+  ordered_at?: string | null;
   order_items?: DbOrderItemWithProduct[] | null;
 };
 
@@ -155,8 +157,10 @@ function orderItemToClient(item: DbOrderItemWithProduct): Order["order_items"] e
 }
 
 function toClientOrder(row: DbOrder): Order {
+  const orderId = row.order_id || row.id || "";
   return {
-    id: row.order_id,
+    id: orderId,
+    order_id: orderId,
     user_id: row.user_id,
     razorpay_order_id: row.razorpay_order_id ?? undefined,
     razorpay_payment_id: row.razorpay_payment_id ?? undefined,
@@ -164,6 +168,7 @@ function toClientOrder(row: DbOrder): Order {
     order_status: row.order_status as Order["order_status"],
     payment_method: row.payment_method ?? undefined,
     total_price: Number(row.total_price),
+    ordered_at: row.ordered_at ?? undefined,
     order_items: (row.order_items ?? []).map((it) => orderItemToClient(it)),
   };
 }

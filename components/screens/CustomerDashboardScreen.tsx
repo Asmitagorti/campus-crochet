@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { Navigate, AuthUser, CustomRequest, Order } from "@/types";
@@ -399,7 +399,7 @@ function OrdersTab({
   return (
     <>
       {activeOrders.map((order) => (
-        <OrderCard key={order.id} order={order} />
+        <OrderCard key={order.order_id || order.id} order={order} />
       ))}
 
       {readyOrders.length > 0 && (
@@ -425,7 +425,7 @@ function OrdersTab({
             </h2>
           </div>
           {readyOrders.map((order) => (
-            <OrderCard key={order.id} order={order} />
+            <OrderCard key={order.order_id || order.id} order={order} />
           ))}
         </section>
       )}
@@ -444,7 +444,7 @@ function OrdersTab({
             Completed
           </h2>
           {completedOrders.map((order) => (
-            <OrderCard key={order.id} order={order} compact />
+            <OrderCard key={order.order_id || order.id} order={order} compact />
           ))}
         </section>
       )}
@@ -510,8 +510,8 @@ function OrderCard({ order, compact }: { order: Order; compact?: boolean }) {
             {item?.selected_color ? `${item.selected_color} · ` : ""}₹{item?.price_at_purchase ?? order.total_price}
           </p>
           <p style={{ color: "#7A6058", fontSize: "0.78rem", marginTop: 2 }}>
-            Order #{order.id.slice(0, 8)} ·{" "}
-            {new Date(order.created_at ?? new Date().toISOString()).toLocaleDateString("en-IN", {
+            Order #{(order.order_id || order.id || "").slice(0, 8)} ·{" "}
+            {new Date(order.ordered_at ?? new Date().toISOString()).toLocaleDateString("en-IN", {
               day: "numeric",
               month: "short",
             })}

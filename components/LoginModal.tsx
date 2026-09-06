@@ -312,7 +312,9 @@ export default function LoginModal({
        * global user state will also update.
        */
 
-      if (isAdmin) {
+      const isAdminMode = isAdmin || email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+      if (isAdminMode) {
         await supabase.auth.updateUser({
           data: { name: "Admin", role: "admin" },
         });
@@ -388,7 +390,7 @@ export default function LoginModal({
       return;
     }
 
-    await supabase.auth.updateUser({
+    const { error: updateErr } = await supabase.auth.updateUser({
       data: {
         name: details.name.trim(),
         role: "student",
@@ -398,6 +400,32 @@ export default function LoginModal({
         phone: details.phone.trim(),
       },
     });
+
+    if (updateErr) {
+      setDetailError(updateErr.message || "Failed to update profile details.");
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session || !session.access_token) {
+      setDetailError("Session verification failed. Please try signing in again.");
+      setStep("email");
+      return;
+    }
+
+    const syncRes = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_token: session.access_token }),
+    }).catch(() => null);
+
+    if (!syncRes || !syncRes.ok) {
+      setDetailError("Failed to synchronize session with server. Please try again.");
+      return;
+    }
 
     const user: AuthUser = {
       id: supabaseUser.id,

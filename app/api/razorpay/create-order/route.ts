@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   const db = getServiceRoleClient();
   const { data: order, error: orderErr } = await db
     .from("orders")
-    .select("order_id, user_id, total_price, payment_status, created_at")
+    .select("order_id, user_id, total_price, payment_status, ordered_at")
     .eq("order_id", orderId)
     .maybeSingle();
 
@@ -97,8 +97,9 @@ export async function POST(request: Request) {
   }
 
   // 30-minute expiration check for unpaid pending orders
-  if (order.created_at) {
-    const createdAtMs = new Date(order.created_at).getTime();
+  const orderedAt = (order as { ordered_at?: string; created_at?: string }).ordered_at ?? (order as { created_at?: string }).created_at;
+  if (orderedAt) {
+    const createdAtMs = new Date(orderedAt).getTime();
     if (Number.isFinite(createdAtMs) && Date.now() - createdAtMs > 30 * 60 * 1000) {
       await db
         .from("orders")

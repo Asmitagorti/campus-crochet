@@ -74,7 +74,8 @@ export type OrderLifecycleStatus =
   | 'cancelled';
 
 export interface Order {
-  id: string;
+  id?: string;
+  order_id: string;
   user_id: string;
   total_price: number;
   payment_status: PaymentStatus;
@@ -82,7 +83,7 @@ export interface Order {
   razorpay_order_id?: string;
   razorpay_payment_id?: string;
   payment_method?: string;
-  created_at?: string;
+  ordered_at?: string;
   updated_at?: string;
   order_items?: OrderItem[];
 }

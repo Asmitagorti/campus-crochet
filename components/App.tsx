@@ -25,7 +25,7 @@ import { supabase } from "../lib/supabase";
 const ADMIN_EMAIL = "asmileis4evr@gmail.com";
 
 function isAdminUser(user: AuthUser | null): boolean {
-  return !!user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return !!user && (user.role === "admin" || user.email?.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase());
 }
 
 const ADMIN_PAGES: Page[] = [
@@ -85,6 +85,18 @@ export default function App() {
 
   // ── Restore Supabase session ─────────────────────────────────────────────
   useEffect(() => {
+    async function syncServerSession(token?: string) {
+      if (token) {
+        await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token: token }),
+        }).catch(() => {});
+      } else {
+        await fetch("/api/session", { method: "DELETE" }).catch(() => {});
+      }
+    }
+
     async function restoreSession() {
       const {
         data: { session },
@@ -96,14 +108,22 @@ export default function App() {
           session.user.email
         );
 
+        if (session.access_token) {
+          await syncServerSession(session.access_token);
+        }
+
+        const isEmailAdmin = session.user.email?.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        const role: AuthUser["role"] = isEmailAdmin
+          ? "admin"
+          : (session.user.user_metadata?.role as AuthUser["role"]) || "customer";
+
         const metaName = session.user.user_metadata?.name?.trim();
         const fallbackName = session.user.email ? session.user.email.split("@")[0] : "Student";
         const authUser: AuthUser = {
           id: session.user.id,
           email: session.user.email ?? "",
-          role:
-            session.user.user_metadata?.role ?? "customer",
-          name: metaName || fallbackName || "Student",
+          role,
+          name: isEmailAdmin ? (metaName || "Admin") : (metaName || fallbackName || "Student"),
         };
 
         setUser(authUser);
@@ -116,12 +136,12 @@ export default function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!session?.user) {
+      async (event, session) => {
+        if (event === "SIGNED_OUT" || !session?.user) {
+          if (event === "SIGNED_OUT") {
+            await syncServerSession(undefined);
+          }
           setUser(null);
-
-          await fetch("/api/session", { method: "DELETE" }).catch(() => {});
-
           return;
         }
 
@@ -129,21 +149,21 @@ export default function App() {
         // cookie so server-side routes can verify the user
         // without trusting the client body.
         if (session.access_token) {
-          await fetch("/api/session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ access_token: session.access_token }),
-          }).catch(() => {});
+          await syncServerSession(session.access_token);
         }
+
+        const isEmailAdmin = session.user.email?.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        const role: AuthUser["role"] = isEmailAdmin
+          ? "admin"
+          : (session.user.user_metadata?.role as AuthUser["role"]) || "customer";
 
         const metaName = session.user.user_metadata?.name?.trim();
         const fallbackName = session.user.email ? session.user.email.split("@")[0] : "Student";
         const authUser: AuthUser = {
           id: session.user.id,
           email: session.user.email ?? "",
-          role:
-            session.user.user_metadata?.role ?? "customer",
-          name: metaName || fallbackName || "Student",
+          role,
+          name: isEmailAdmin ? (metaName || "Admin") : (metaName || fallbackName || "Student"),
         };
 
         setUser(authUser);
@@ -233,7 +253,7 @@ export default function App() {
       }! You're signed in. 🧶`
     );
 
-    if (authedUser.role === "admin") {
+    if (authedUser.role === "admin" || isAdminUser(authedUser)) {
       navigate("admin");
     }
   }

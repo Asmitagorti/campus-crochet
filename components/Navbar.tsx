@@ -11,12 +11,15 @@ interface Props {
   onLogout: () => void
 }
 
+const ADMIN_EMAIL = "asmileis4evr@gmail.com";
+
 export default function Navbar({ page, navigate, cart, user, onLoginClick, onLogout }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0)
+  const isAdmin = user?.role === 'admin' || (!!user?.email && user.email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase());
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -94,8 +97,8 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
                         {/* {user.rollNumber && (
                           <p style={{ color: '#7A6058', fontSize: '0.72rem', marginTop: 1 }}>{user.rollNumber} · {user.college}</p>
                         )} */}
-                        <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '0.12rem 0.45rem', borderRadius: 50, backgroundColor: user.role === 'admin' ? '#2E1D15' : '#EDD4D4', color: user.role === 'admin' ? '#D8A7A7' : '#8B4A3A', display: 'inline-block', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {user.role}
+                        <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '0.12rem 0.45rem', borderRadius: 50, backgroundColor: isAdmin ? '#2E1D15' : '#EDD4D4', color: isAdmin ? '#D8A7A7' : '#8B4A3A', display: 'inline-block', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {isAdmin ? 'admin' : user.role}
                         </span>
                       </div>
                     </div>
@@ -103,7 +106,7 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
 
                   {/* Actions */}
                   <div style={{ padding: '0.5rem 0' }}>
-                    {user.role === 'admin' && (
+                    {isAdmin && (
                       <DropdownItem icon={<AdminIcon />} label="Admin Panel" onClick={() => { navigate('admin'); setProfileOpen(false) }} />
                     )}
                     <DropdownItem icon={<AIAssistantIcon />} label="AI Assistant" onClick={() => { navigate('ai-assistant'); setProfileOpen(false) }} />
@@ -155,7 +158,7 @@ export default function Navbar({ page, navigate, cart, user, onLoginClick, onLog
             <button onClick={() => { navigate('ai-assistant'); setMenuOpen(false) }}>AI Assistant</button>
             <button onClick={() => { navigate('dashboard'); setMenuOpen(false) }}>My Orders</button>
             <button onClick={() => { navigate('cart'); setMenuOpen(false) }}>My Cart {cartCount > 0 ? `(${cartCount})` : ''}</button>
-            {user.role === 'admin' && (
+            {isAdmin && (
               <button onClick={() => { navigate('admin'); setMenuOpen(false) }}>Admin Panel</button>
             )}
             <button onClick={() => { onLogout(); setMenuOpen(false) }}>Sign out</button>

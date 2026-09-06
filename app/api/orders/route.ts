@@ -34,7 +34,8 @@ export async function GET(request: Request) {
   if (userId && userId !== session.id && !isAdmin(session)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
-  const effectiveUserId = isAdmin(session) ? userId || session.id : session.id;
+  // Admin with no user_id param → return all orders; otherwise scope to the requested/own user
+  const effectiveUserId: string | null = isAdmin(session) && !userId ? null : (userId || session.id);
 
   const db = getServiceRoleClient();
   let query = db
@@ -48,6 +49,7 @@ export async function GET(request: Request) {
       order_status,
       payment_method,
       total_price,
+      ordered_at,
       order_items (
         order_item_id,
         order_id,
@@ -92,6 +94,7 @@ export async function GET(request: Request) {
       order_status: OrderLifecycleStatus;
       payment_method: string | null;
       total_price: number | string;
+      ordered_at?: string | null;
       order_items?: Array<{
         order_item_id: string;
         order_id: string;
@@ -141,6 +144,7 @@ export async function GET(request: Request) {
 
     return {
       id: r.order_id,
+      order_id: r.order_id,
       user_id: r.user_id,
       razorpay_order_id: r.razorpay_order_id ?? undefined,
       razorpay_payment_id: r.razorpay_payment_id ?? undefined,
@@ -148,6 +152,7 @@ export async function GET(request: Request) {
       order_status: r.order_status,
       payment_method: r.payment_method ?? undefined,
       total_price: Number(r.total_price),
+      ordered_at: r.ordered_at ?? undefined,
       order_items: items,
     } satisfies Order;
   });
@@ -199,6 +204,38 @@ export async function POST(request: Request) {
 
   const db = getServiceRoleClient();
 
+  // Ensure public.users row exists for the authenticated session user
+  const { data: existingUser, error: findUserError } = await db
+    .from("users")
+    .select("user_id")
+    .eq("user_id", user_id)
+    .maybeSingle();
+
+  if (findUserError) {
+    console.error("USER PROFILE CHECK ERROR:", findUserError);
+    return Response.json(
+      { error: "Failed to verify user profile" },
+      { status: 500 }
+    );
+  }
+
+  if (!existingUser) {
+    const { error: createUserError } = await db
+      .from("users")
+      .insert({
+        user_id,
+        email: session.email,
+      });
+
+    if (createUserError) {
+      console.error("USER PROFILE CREATION ERROR:", createUserError);
+      return Response.json(
+        { error: "Failed to create user profile for order" },
+        { status: 500 }
+      );
+    }
+  }
+
   // Cancel any old unpaid pending orders older than 30 minutes for this user
   const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
   await db
@@ -209,7 +246,7 @@ export async function POST(request: Request) {
     })
     .eq("user_id", user_id)
     .eq("payment_status", "pending")
-    .lt("created_at", thirtyMinsAgo);
+    .lt("ordered_at", thirtyMinsAgo);
 
   const productIds = Array.from(new Set(normalized.map((it) => it.productId)));
   const { data: products, error: prodErr } = await db
@@ -301,6 +338,7 @@ export async function POST(request: Request) {
   return Response.json({
     order: {
       id: orderId,
+      order_id: orderId,
       ...(order as Record<string, unknown>),
     },
     server_total: serverTotal,

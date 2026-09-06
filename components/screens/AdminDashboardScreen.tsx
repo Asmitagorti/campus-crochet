@@ -1,27 +1,24 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Navigate, Product, CustomRequest } from "@/types"
-import { products as initialProducts } from "@/data/products"
 import { YarnBall, CrochetFlower } from "../YarnDecor"
 import { supabase } from "@/lib/supabase"
 
 type AdminSection = 'dashboard' | 'orders' | 'products' | 'custom' | 'past-creations'
 
-// â”€â”€ Full order dataset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Seed/mocked snapshot used by the Dashboard overview only. The All Orders
-// section now uses live Supabase data; these rows are intentionally labelled
-// as AdminOrder so the dashboard previews stay typed.
-const ALL_ORDERS: AdminOrder[] = [
-  { id: 'ORD-001', product: 'Daisy Scrunchie', customer: 'Ananya Reddy', college: 'ACET', status: 'completed', date: 'Aug 12, 2026', amount: 120, color: 'Sage Green', image: '' },
-  { id: 'ORD-002', product: 'Flower Keychain', customer: 'Priya Srinivas', college: 'AEC', status: 'completed', date: 'Aug 5, 2026', amount: 85, color: 'Lavender', image: '' },
-  { id: 'ORD-003', product: 'Mini Tote Bag', customer: 'Divya Lakshmi', college: 'Aditya Degree College', status: 'completed', date: 'Jul 28, 2026', amount: 350, color: 'Natural Cream', image: '' },
-  { id: 'ORD-004', product: 'Pastel Phone Charm', customer: 'Kavya Mohan', college: 'ACET', status: 'completed', date: 'Jul 20, 2026', amount: 150, color: 'Blush Pink', image: '' },
-  { id: 'ORD-005', product: 'Mini Tote Bag', customer: 'Sneha Teja', college: 'Aditya Degree College', status: 'quality_check', date: 'Jul 12, 2026', amount: 350, color: 'Sage Green', image: '' },
-  { id: 'ORD-006', product: 'Flower Keychain', customer: 'Meghana Rao', college: 'ACET', status: 'yarn_selected', date: 'Jul 15, 2026', amount: 85, color: 'White', image: '' },
-  { id: 'ORD-007', product: 'Daisy Scrunchie', customer: 'Meera Sharma', college: 'AEC', status: 'payment_received', date: 'Jul 18, 2026', amount: 120, color: 'Dusty Rose', image: '' },
-  { id: 'ORD-008', product: 'Pastel Phone Charm', customer: 'Lasya Patel', college: 'ACET', status: 'crocheting', date: 'Jul 19, 2026', amount: 150, color: 'Lavender', image: '' },
-  { id: 'ORD-009', product: 'Heart Coaster Set', customer: 'Sravani K.', college: 'AEC', status: 'ready', date: 'Jul 21, 2026', amount: 180, color: 'Rose & Cream', image: '' },
-  { id: 'ORD-010', product: 'Sunflower Bookmark', customer: 'Bhavana M.', college: 'Aditya Pharmacy College', status: 'crocheting', date: 'Jul 21, 2026', amount: 70, color: 'Sunflower Yellow', image: '' },
-]
+// ── AdminOrder local type ────────────────────────────────────────────────
+// Used by both DashboardSection (live) and OrdersSection (live).
+// Declared early so DashboardSection can reference it.
+type AdminOrder = {
+  id: string
+  product: string
+  customer: string
+  college: string
+  status: string
+  date: string
+  amount: number
+  color: string
+  image: string
+}
 
 const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
   payment_received: { label: 'Payment received', bg: '#EDD4D4', text: '#8B4A3A' },
@@ -34,9 +31,9 @@ const STATUS_META: Record<string, { label: string; bg: string; text: string }> =
 
 const colorOptions = ['Dusty Rose', 'Cream', 'Sage Green', 'Lavender', 'Terracotta', 'Warm Brown', 'Sunflower Yellow', 'White', 'Blush Pink', 'Natural Cream', 'Rose & Cream', 'Mixed Pastels']
 const categoryOptions = ['Scrunchies', 'Keychains', 'Charms', 'Bookmarks', 'Bags', 'Home']
-const processingOptions = ['3â€“5 working days', '5â€“7 working days', '7â€“10 working days']
+const processingOptions = ['3–5 working days', '5–7 working days', '7–10 working days']
 
-// â”€â”€ Confirmation dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Confirmation dialog ──────────────────────────────────────────────────────────────────────────────────────
 function ConfirmDialog({
   title,
   message,
@@ -112,7 +109,7 @@ function ConfirmDialog({
   )
 }
 
-// â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Sidebar ────────────────────────────────────────────────────────────────────────────────────────────────────────
 function Sidebar({ section, setSection, navigate, onLogout }: { section: AdminSection; setSection: (s: AdminSection) => void; navigate: Navigate; onLogout: () => void }) {
   const items: { key: AdminSection; label: string; icon: React.ReactNode }[] = [
     { key: 'dashboard', label: 'Dashboard', icon: <GridIcon /> },
@@ -158,32 +155,79 @@ function Sidebar({ section, setSection, navigate, onLogout }: { section: AdminSe
   )
 }
 
-// â”€â”€ Dashboard Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function DashboardSection({ setSection, products: _products, loginCount = 0 }: { setSection: (s: AdminSection) => void; products: Product[]; loginCount?: number }) {
-  const totalRevenue = ALL_ORDERS.reduce((s, o) => s + o.amount, 0)
-  const completedOrders = ALL_ORDERS.filter(o => o.status === 'completed')
-  const activeOrders = ALL_ORDERS.filter(o => o.status !== 'completed')
-  const pendingOrders = ALL_ORDERS.filter(o => ['payment_received', 'yarn_selected'].includes(o.status))
+// ── Dashboard Overview ──────────────────────────────────────────────────────────────────────────────────────
+function DashboardSection({ setSection, loginCount = 0 }: { setSection: (s: AdminSection) => void; loginCount?: number }) {
+  const [liveOrders, setLiveOrders] = useState<AdminOrder[]>([])
+  const [dashLoading, setDashLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadDashOrders() {
+      setDashLoading(true)
+      try {
+        const res = await fetch('/api/orders')
+        if (!res.ok) return
+        const data: unknown[] = (await res.json()) ?? []
+        const normalized: AdminOrder[] = data.map((raw) => {
+          const o = raw as {
+            order_id?: string
+            id?: string
+            user_id: string | null
+            order_status?: string
+            ordered_at?: string
+            total_price?: number | string
+            order_items?: Array<{
+              selected_color?: string
+              products?: { name?: string; image?: string } | null
+            }>
+          }
+          const item = o.order_items?.[0]
+          const product = item?.products
+          const orderId = o.order_id ?? o.id ?? ''
+          const dateStr = o.ordered_at ?? new Date().toISOString()
+          return {
+            id: orderId,
+            product: product?.name ?? 'Custom order',
+            customer: o.user_id ? o.user_id.slice(0, 8) : 'Customer',
+            college: '—',
+            status: o.order_status ?? 'pending',
+            date: new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+            amount: Number(o.total_price ?? 0),
+            color: item?.selected_color ?? 'Custom',
+            image: product?.image ?? '',
+          }
+        })
+        setLiveOrders(normalized)
+      } finally {
+        setDashLoading(false)
+      }
+    }
+    loadDashOrders()
+  }, [])
+
+  const totalRevenue = liveOrders.reduce((s, o) => s + o.amount, 0)
+  const completedOrders = liveOrders.filter(o => o.status === 'completed')
+  const activeOrders = liveOrders.filter(o => o.status !== 'completed')
+  const pendingOrders = liveOrders.filter(o => ['payment_received', 'yarn_selected'].includes(o.status))
 
   // Most ordered product
   const productCount: Record<string, number> = {}
-  ALL_ORDERS.forEach(o => { productCount[o.product] = (productCount[o.product] ?? 0) + 1 })
+  liveOrders.forEach(o => { productCount[o.product] = (productCount[o.product] ?? 0) + 1 })
   const mostOrdered = Object.entries(productCount).sort((a, b) => b[1] - a[1])[0]
 
   // Revenue by product
   const revenueByProduct: Record<string, number> = {}
-  ALL_ORDERS.forEach(o => { revenueByProduct[o.product] = (revenueByProduct[o.product] ?? 0) + o.amount })
+  liveOrders.forEach(o => { revenueByProduct[o.product] = (revenueByProduct[o.product] ?? 0) + o.amount })
   const topRevenue = Object.entries(revenueByProduct).sort((a, b) => b[1] - a[1])
 
   // Orders by college
   const collegeCount: Record<string, number> = {}
-  ALL_ORDERS.forEach(o => { collegeCount[o.college] = (collegeCount[o.college] ?? 0) + 1 })
+  liveOrders.forEach(o => { if (o.college !== '—') collegeCount[o.college] = (collegeCount[o.college] ?? 0) + 1 })
 
   const stats = [
-    { label: 'Total Orders', value: ALL_ORDERS.length, sub: `${completedOrders.length} completed`, color: '#D8A7A7', icon: 'ðŸ“¦' },
-    { label: 'Active Orders', value: activeOrders.length, sub: `${pendingOrders.length} pending start`, color: '#FDE9CC', icon: 'ðŸª¡' },
-    { label: 'Total Revenue', value: `â‚¹${totalRevenue.toLocaleString('en-IN')}`, sub: 'all time', color: '#C8D8C0', icon: 'ðŸ’š' },
-    { label: 'Logged-in Users', value: loginCount, sub: 'this session', color: '#D4C8EE', icon: 'ðŸ‘¥' },
+    { label: 'Total Orders', value: dashLoading ? '…' : liveOrders.length, sub: `${completedOrders.length} completed`, color: '#D8A7A7', icon: '📦' },
+    { label: 'Active Orders', value: dashLoading ? '…' : activeOrders.length, sub: `${pendingOrders.length} pending start`, color: '#FDE9CC', icon: '🪡' },
+    { label: 'Total Revenue', value: dashLoading ? '…' : `₹${totalRevenue.toLocaleString('en-IN')}`, sub: 'all time', color: '#C8D8C0', icon: '💚' },
+    { label: 'Logged-in Users', value: loginCount, sub: 'this session', color: '#D4C8EE', icon: '👥' },
   ]
 
   return (
@@ -206,70 +250,90 @@ function DashboardSection({ setSection, products: _products, loginCount = 0 }: {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-        {/* Most ordered + top revenue */}
+        {/* Revenue by product */}
         <div style={{ backgroundColor: '#F7F3EC', borderRadius: 18, padding: '1.4rem', border: '1px solid #EDD4D4' }}>
           <p style={{ fontWeight: 700, color: '#2E1D15', fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            ðŸ† Revenue by Product
+            🏆 Revenue by Product
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {topRevenue.map(([product, revenue]) => {
-              const pct = Math.round((revenue / totalRevenue) * 100)
-              return (
-                <div key={product}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 3 }}>
-                    <span style={{ color: '#2E1D15', fontWeight: product === mostOrdered[0] ? 700 : 400 }}>{product}</span>
-                    <span style={{ color: '#C97B63', fontWeight: 600 }}>â‚¹{revenue}</span>
+          {dashLoading ? (
+            <p style={{ color: '#7A6058', fontSize: '0.82rem' }}>Loading…</p>
+          ) : topRevenue.length === 0 ? (
+            <p style={{ color: '#7A6058', fontSize: '0.82rem' }}>No orders yet.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {topRevenue.map(([product, revenue]) => {
+                const pct = totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100) : 0
+                return (
+                  <div key={product}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 3 }}>
+                      <span style={{ color: '#2E1D15', fontWeight: mostOrdered && product === mostOrdered[0] ? 700 : 400 }}>{product}</span>
+                      <span style={{ color: '#C97B63', fontWeight: 600 }}>₹{revenue}</span>
+                    </div>
+                    <div style={{ height: 5, backgroundColor: '#EDD4D4', borderRadius: 10, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, backgroundColor: mostOrdered && product === mostOrdered[0] ? '#C97B63' : '#D8A7A7', borderRadius: 10, transition: 'width 0.5s' }} />
+                    </div>
                   </div>
-                  <div style={{ height: 5, backgroundColor: '#EDD4D4', borderRadius: 10, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, backgroundColor: product === mostOrdered[0] ? '#C97B63' : '#D8A7A7', borderRadius: 10, transition: 'width 0.5s' }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Orders by college */}
         <div style={{ backgroundColor: '#F7F3EC', borderRadius: 18, padding: '1.4rem', border: '1px solid #EDD4D4' }}>
-          <p style={{ fontWeight: 700, color: '#2E1D15', fontSize: '0.9rem', marginBottom: '1rem' }}>ðŸ« Orders by College</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            {Object.entries(collegeCount).sort((a, b) => b[1] - a[1]).map(([college, count]) => (
-              <div key={college} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#7A6058', fontSize: '0.82rem' }}>{college}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ height: 5, width: count * 18, backgroundColor: '#A8B8A0', borderRadius: 10 }} />
-                  <span style={{ color: '#2E1D15', fontWeight: 600, fontSize: '0.82rem' }}>{count}</span>
+          <p style={{ fontWeight: 700, color: '#2E1D15', fontSize: '0.9rem', marginBottom: '1rem' }}>🏫 Orders by College</p>
+          {dashLoading ? (
+            <p style={{ color: '#7A6058', fontSize: '0.82rem' }}>Loading…</p>
+          ) : Object.keys(collegeCount).length === 0 ? (
+            <p style={{ color: '#7A6058', fontSize: '0.82rem' }}>No college data yet.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {Object.entries(collegeCount).sort((a, b) => b[1] - a[1]).map(([college, count]) => (
+                <div key={college} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#7A6058', fontSize: '0.82rem' }}>{college}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ height: 5, width: Math.max(count * 18, 4), backgroundColor: '#A8B8A0', borderRadius: 10 }} />
+                    <span style={{ color: '#2E1D15', fontWeight: 600, fontSize: '0.82rem' }}>{count}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Most ordered callout */}
-      <div style={{ backgroundColor: '#2E1D15', borderRadius: 18, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: 28 }}>
-        <CrochetFlower size={28} color="#D8A7A7" />
-        <div>
-          <p style={{ color: '#B88080', fontSize: '0.8rem' }}>Most ordered product</p>
-          <p style={{ color: '#F7F3EC', fontFamily: 'Playfair Display, Georgia, serif', fontWeight: 700, fontSize: '1.1rem' }}>
-            {mostOrdered[0]} â€” {mostOrdered[1]} orders
-          </p>
+      {mostOrdered && (
+        <div style={{ backgroundColor: '#2E1D15', borderRadius: 18, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: 28 }}>
+          <CrochetFlower size={28} color="#D8A7A7" />
+          <div>
+            <p style={{ color: '#B88080', fontSize: '0.8rem' }}>Most ordered product</p>
+            <p style={{ color: '#F7F3EC', fontFamily: 'Playfair Display, Georgia, serif', fontWeight: 700, fontSize: '1.1rem' }}>
+              {mostOrdered[0]} – {mostOrdered[1]} orders
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Recent orders */}
       <div style={{ backgroundColor: '#F7F3EC', borderRadius: 18, border: '1px solid #EDD4D4', overflow: 'hidden' }}>
         <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #EDD4D4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ fontWeight: 700, color: '#2E1D15', fontSize: '0.95rem' }}>Recent Orders</p>
-          <button onClick={() => setSection('orders')} style={{ color: '#C97B63', fontSize: '0.82rem', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>View all â†’</button>
+          <button onClick={() => setSection('orders')} style={{ color: '#C97B63', fontSize: '0.82rem', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>View all →</button>
         </div>
-        <OrderTable orders={ALL_ORDERS.slice(0, 5)} showActions={false} />
+        {dashLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#7A6058', fontSize: '0.85rem' }}>Loading…</div>
+        ) : liveOrders.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#7A6058', fontSize: '0.85rem' }}>No orders yet.</div>
+        ) : (
+          <OrderTable orders={liveOrders.slice(0, 5)} showActions={false} />
+        )}
       </div>
     </div>
   )
 }
 
-// â”€â”€ Orders Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Orders Table ──────────────────────────────────────────────────────────────────────────────────────
 function OrderTable({
   orders,
   showActions,
@@ -305,7 +369,7 @@ function OrderTable({
                 <td style={{ padding: '0.8rem 1.25rem' }}>
                   <span style={{ backgroundColor: sc.bg, color: sc.text, fontSize: '0.68rem', fontWeight: 600, padding: '0.22rem 0.6rem', borderRadius: 50, whiteSpace: 'nowrap' }}>{sc.label}</span>
                 </td>
-                <td style={{ padding: '0.8rem 1.25rem', fontWeight: 700, color: '#C97B63', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>â‚¹{o.amount}</td>
+                <td style={{ padding: '0.8rem 1.25rem', fontWeight: 700, color: '#C97B63', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>₹{o.amount}</td>
                 {showActions && (
                   <td style={{ padding: '0.8rem 1.25rem' }}>
                     <select
@@ -339,18 +403,6 @@ function OrderTable({
 }
 
 // â”€â”€ All Orders Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-type AdminOrder = {
-  id: string
-  product: string
-  customer: string
-  college: string
-  status: string
-  date: string
-  amount: number
-  color: string
-  image: string
-}
-
 function OrdersSection({ notify }: { notify: (msg: string) => void }) {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -370,28 +422,31 @@ function OrdersSection({ notify }: { notify: (msg: string) => void }) {
       const data: unknown[] = (await res.json()) ?? []
       const normalized: AdminOrder[] = data.map((raw) => {
         const o = raw as {
-          id: string
+          order_id?: string
+          id?: string
           user_id: string | null
-          status: string
-          created_at: string
-          total_amount: number | string
+          order_status?: string
+          ordered_at?: string
+          total_price?: number | string
           order_items?: Array<{
-            color?: string
-            products?: { name?: string; image_url?: string; image?: string } | null
+            selected_color?: string
+            products?: { name?: string; image?: string } | null
           }>
         }
         const item = o.order_items?.[0]
         const product = item?.products
+        const orderId = o.order_id ?? o.id ?? ''
+        const dateStr = o.ordered_at ?? new Date().toISOString()
         return {
-          id: o.id,
+          id: orderId,
           product: product?.name ?? 'Custom order',
           customer: o.user_id ? o.user_id.slice(0, 8) : 'Customer',
           college: '—',
-          status: o.status,
-          date: new Date(o.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-          amount: Number(o.total_amount),
-          color: item?.color ?? 'Custom',
-          image: product?.image_url ?? product?.image ?? '',
+          status: o.order_status ?? 'pending',
+          date: new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          amount: Number(o.total_price ?? 0),
+          color: item?.selected_color ?? 'Custom',
+          image: product?.image ?? '',
         }
       })
       setOrders(normalized)
@@ -433,7 +488,7 @@ function OrdersSection({ notify }: { notify: (msg: string) => void }) {
       const res = await fetch('/api/orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: id, status }),
+        body: JSON.stringify({ order_id: id, order_status: status }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -441,6 +496,7 @@ function OrdersSection({ notify }: { notify: (msg: string) => void }) {
         return
       }
       notify(`Order moved to "${targetLabel}".`)
+      load()
     } finally {
       setPendingId(null)
     }
@@ -938,7 +994,7 @@ function ProductForm({ form, setForm, selectedColors, setSelectedColors, preview
 const BLANK_FORM: FormState = { name: '', shortDesc: '', description: '', price: '', category: '', processingTime: '3â€“5 working days', care: '', stock: '', active: true, featured: false }
 
 function ProductsSection({ notify }: { notify: (msg: string) => void }) {
-  const [productList, setProductList] = useState<Product[]>(initialProducts)
+  const [productList, setProductList] = useState<Product[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
   const [editTarget, setEditTarget] = useState<Product | null>(null)
@@ -1241,7 +1297,6 @@ function ProductsSection({ notify }: { notify: (msg: string) => void }) {
 // â”€â”€ Main AdminDashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AdminDashboard({ navigate, onLogout, loginCount = 0 }: { navigate: Navigate; onLogout: () => void; loginCount?: number }) {
   const [section, setSection] = useState<AdminSection>('dashboard')
-  const [products] = useState(initialProducts)
   const [toast, setToast] = useState('')
 
   function notify(msg: string) {
@@ -1261,7 +1316,7 @@ export default function AdminDashboard({ navigate, onLogout, loginCount = 0 }: {
         </header>
 
         <div style={{ padding: '2rem' }}>
-          {section === 'dashboard' && <DashboardSection setSection={setSection} products={products} loginCount={loginCount} />}
+          {section === 'dashboard' && <DashboardSection setSection={setSection} loginCount={loginCount} />}
           {section === 'orders' && <OrdersSection notify={notify} />}
           {section === 'products' && <ProductsSection notify={notify} />}
           {section === 'custom' && <CustomRequestsSection notify={notify} />}
