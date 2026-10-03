@@ -121,6 +121,24 @@ export function isAdmin(user: SessionUser | null): boolean {
   return !!user && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 }
 
+export async function requireCaller(_req?: Request): Promise<{
+  caller: SessionUser & { isAdmin: boolean };
+  db: Client;
+}> {
+  const caller = await requireSession();
+  const db = getServiceClient();
+  if (!db) {
+    throw new Response(JSON.stringify({ error: "Database configuration is missing." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return {
+    caller: { ...caller, isAdmin: isAdmin(caller) },
+    db,
+  };
+}
+
 export async function requireSession(): Promise<SessionUser> {
   const user = await getSession();
   if (!user) {
@@ -132,7 +150,10 @@ export async function requireSession(): Promise<SessionUser> {
   return user;
 }
 
-export async function requireAdmin(): Promise<SessionUser> {
+export async function requireAdmin(_req?: Request): Promise<{
+  caller: SessionUser & { isAdmin: boolean };
+  db: Client;
+}> {
   const user = await requireSession();
   if (!isAdmin(user)) {
     throw new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -140,5 +161,12 @@ export async function requireAdmin(): Promise<SessionUser> {
       headers: { "Content-Type": "application/json" },
     });
   }
-  return user;
+  const db = getServiceClient();
+  if (!db) {
+    throw new Response(JSON.stringify({ error: "Database configuration is missing." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return { caller: { ...user, isAdmin: true }, db };
 }

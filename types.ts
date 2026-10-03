@@ -23,6 +23,7 @@ export type AuthUser = {
   year?: string;
   phone?: string;
   rollnumber?: string;
+  branch?: string;
 }
 
 export interface Product {
