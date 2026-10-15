@@ -1,151 +1,24 @@
-import { supabase, getServiceRoleClient } from "@/lib/supabase";
-import { getSession, isAdmin } from "@/lib/auth";
-
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
-
-async function razorpayRequest(method: string, path: string, body?: unknown) {
-  const auth = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString("base64");
-  const response = await fetch(`https://api.razorpay.com/v1${path}`, {
-    method,
-    headers: {
-      Authorization: `Basic ${auth}`,
-      "Content-Type": "application/json",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error?.description || "Razorpay API error");
-  }
-  return data;
-}
-
-export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-    return Response.json(
-      { error: "Payment gateway not configured" },
-      { status: 503 }
-    );
-  }
-
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== "object") {
-    return Response.json({ error: "Invalid request body" }, { status: 400 });
-  }
-
-  const { amount, currency = "INR", receipt, notes } = body as {
-    amount?: unknown;
-    currency?: unknown;
-    receipt?: unknown;
-    notes?: unknown;
-  };
-
-  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
-    return Response.json({ error: "amount must be a positive number" }, { status: 400 });
-  }
-
-  if (typeof receipt !== "string" || receipt.length === 0) {
-    return Response.json({ error: "receipt is required" }, { status: 400 });
-  }
-
-  if (typeof currency !== "string" || !/^[A-Z]{3}$/.test(currency)) {
-    return Response.json({ error: "currency must be a 3-letter ISO code" }, { status: 400 });
-  }
-
-  if (!notes || typeof notes !== "object") {
-    return Response.json({ error: "notes object is required" }, { status: 400 });
-  }
-
-  const orderId = typeof (notes as Record<string, unknown>).order_id === "string"
-    ? (notes as Record<string, unknown>).order_id as string
-    : null;
-
-  if (!orderId) {
-    return Response.json({ error: "notes.order_id is required" }, { status: 400 });
-  }
-
-  const db = getServiceRoleClient();
-  const { data: order, error: orderErr } = await db
-    .from("orders")
-    .select("order_id, user_id, total_price, payment_status, ordered_at")
-    .eq("order_id", orderId)
-    .maybeSingle();
-
-  if (orderErr || !order) {
-    return Response.json(
-      { error: orderErr?.message ?? "Order not found" },
-      { status: 404 }
-    );
-  }
-
-  if (order.user_id !== session.id && !isAdmin(session)) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  if (order.payment_status !== "pending") {
-    return Response.json(
-      { error: `Cannot create payment for order in payment_status '${order.payment_status}'` },
-      { status: 400 }
-    );
-  }
-
-  // 30-minute expiration check for unpaid pending orders
-  const orderedAt = (order as { ordered_at?: string; created_at?: string }).ordered_at ?? (order as { created_at?: string }).created_at;
-  if (orderedAt) {
-    const createdAtMs = new Date(orderedAt).getTime();
-    if (Number.isFinite(createdAtMs) && Date.now() - createdAtMs > 30 * 60 * 1000) {
-      await db
-        .from("orders")
-        .update({
-          order_status: "cancelled",
-          payment_status: "failed",
-        })
-        .eq("order_id", orderId);
-
-      return Response.json(
-        { error: "Order has expired. Please create a new order." },
-        { status: 400 }
-      );
-    }
-  }
-
-  const expectedPaise = Math.round(Number(order.total_price) * 100);
-  if (Math.abs(expectedPaise - Math.round(amount * 100)) > 1) {
-    return Response.json(
-      { error: "amount does not match order total" },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const orderRes = await razorpayRequest("POST", "/orders", {
-      amount: expectedPaise,
-      currency,
-      receipt,
-      notes,
-    });
-
-    await db
-      .from("orders")
-      .update({ razorpay_order_id: orderRes.id })
-      .eq("order_id", orderId);
-
-    return Response.json({
-      order_id: orderRes.id,
-      amount: orderRes.amount,
-      currency: orderRes.currency,
-      key_id: RAZORPAY_KEY_ID,
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Razorpay error";
-    console.error("RAZORPAY ORDER ERROR:", error);
-    return Response.json({ error: message }, { status: 500 });
-  }
+import {randomUUID} from 'node:crypto';
+import {requireSession} from '@/lib/auth';
+import {failure,readBody,text,UUID,ApiError} from '@/lib/api';
+import {getServiceRoleClient} from '@/lib/server-db';
+import {gateway,type GatewayOrder} from '@/lib/razorpay';
+export async function POST(request:Request){
+ try{const u=await requireSession(),b=await readBody(request),db=getServiceRoleClient();
+ const id=text(b.order_id||(b.notes as {order_id?:string})?.order_id);
+ if(!UUID.test(id))throw new ApiError('Select a valid order');
+ const {data:owned,error:findError}=await db.from('orders').select('order_id,user_id').eq('order_id',id).single();
+ if(findError)throw findError;if(owned.user_id!==u.id)throw new ApiError('Access denied',403);
+ if(!process.env.RAZORPAY_KEY_ID||!process.env.RAZORPAY_KEY_SECRET)throw new ApiError('Online payment is not configured. Contact support.',503);
+ const claim=randomUUID();const {data:o,error}=await db.rpc('cc_claim_gateway',{p_id:id,p_claim:claim});if(error)throw error;
+ let rz:GatewayOrder;
+ if(o.razorpay_order_id)rz=await gateway<GatewayOrder>(`/orders/${encodeURIComponent(o.razorpay_order_id)}`);
+ else {
+  try{
+   rz=await gateway<GatewayOrder>('/orders','POST',{amount:Math.round(Number(o.total_price)*100),currency:'INR',receipt:id,notes:{order_id:id}});
+   const {error:saveError}=await db.rpc('cc_attach_gateway',{p_id:id,p_claim:claim,p_gateway:rz.id});if(saveError)throw saveError;
+  }catch(e){await db.from('orders').update({gateway_claim:null,gateway_claimed_at:null}).eq('order_id',id).eq('gateway_claim',claim);throw e;}
+ }
+ return Response.json({order_id:rz.id,amount:rz.amount,currency:rz.currency,key_id:process.env.RAZORPAY_KEY_ID});
+ }catch(e){return failure(e);}
 }

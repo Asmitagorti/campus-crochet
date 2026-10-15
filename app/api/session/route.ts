@@ -1,59 +1,16 @@
-import { NextResponse } from "next/server";
-
-export async function POST(request: Request) {
-  const body = (await request.json().catch(() => ({}))) as { access_token?: unknown };
-  const access_token =
-    typeof body.access_token === "string" ? body.access_token : null;
-
-  if (!access_token) {
-    return NextResponse.json(
-      { error: "access_token is required" },
-      { status: 400 }
-    );
-  }
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
-  try {
-    const res = await fetch(`${url}/auth/v1/user`, {
-      headers: {
-        apikey: anonKey,
-        Authorization: `Bearer ${access_token}`,
-      },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 }
-      );
-    }
-    const user = (await res.json()) as { id?: string; email?: string };
-    if (!user.id) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    const { cookies } = await import("next/headers");
-    const cookieStore = await cookies();
-    cookieStore.set("cc-session", access_token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60, // 1 hour — matches Supabase access-token JWT expiry
-    });
-
-    return NextResponse.json({ ok: true, user: { id: user.id, email: user.email ?? "" } });
-  } catch (error) {
-    console.error("session POST error:", error);
-    return NextResponse.json({ error: "Failed to set session" }, { status: 500 });
-  }
+import {cookies} from 'next/headers';
+import {getSession} from '@/lib/auth';
+import {failure,ensureProfile} from '@/lib/api';
+export async function GET(){const user=await getSession();return Response.json({user});}
+export async function POST(request:Request){
+ const b=await request.json().catch(()=>null),token=b?.access_token;
+ if(typeof token!=='string'||token.length>10000)return Response.json({error:'A valid access token is required'},{status:400});
+ try{
+ const r=await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`,{headers:{apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||'',Authorization:`Bearer ${token}`},cache:'no-store',signal:AbortSignal.timeout(8000)});
+ if(!r.ok)return Response.json({error:'Please sign in again.'},{status:401});
+ const u=await r.json();if(!u.id||!u.email_confirmed_at)return Response.json({error:'Verify your email to continue.'},{status:401});
+ const cookieStore=await cookies();cookieStore.set('cc-session',token,{httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production',path:'/',maxAge:60*60});
+ const user=await getSession();if(user)await ensureProfile(user);return Response.json({ok:true,user});
+ }catch(e){return failure(e);}
 }
-
-export async function DELETE() {
-  const { cookies } = await import("next/headers");
-  const cookieStore = await cookies();
-  cookieStore.delete("cc-session");
-  return NextResponse.json({ ok: true });
-}
+export async function DELETE(){(await cookies()).delete('cc-session');return Response.json({ok:true});}

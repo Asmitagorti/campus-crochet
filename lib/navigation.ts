@@ -1,0 +1,4 @@
+import type {Page} from '@/types';
+export const paths:Record<Page,string>={home:'/',catalog:'/collections',product:'/products',dashboard:'/orders',admin:'/admin','add-product':'/admin/products','past-creations':'/admin/creations',gallery:'/creations',payment:'/checkout',about:'/about',cart:'/cart',support:'/support',policy:'/ordering-policy','custom-request':'/custom-request'};
+export function hrefForPage(page:Page,data?:Record<string,string>){const p=paths[page];if(page==='product'&&data?.id)return p+'/'+encodeURIComponent(data.id);const q=new URLSearchParams(data);return p+(q.size?'?'+q.toString():'');}
+export function pageForPath(path:string):Page|null{if(/^\/products\/[0-9a-f-]{36}$/i.test(path))return 'product';return (Object.entries(paths).find(([,v])=>v===path)?.[0] as Page)||null;}

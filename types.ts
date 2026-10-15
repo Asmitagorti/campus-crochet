@@ -1,143 +1,16 @@
-export type Page =
-  | 'home'
-  | 'catalog'
-  | 'product'
-  | 'dashboard'
-  | 'admin'
-  | 'add-product'
-  | 'past-creations'
-  | 'payment'
-  | 'about'
-  | 'cart'
-  | 'ai-assistant';
-
-export type AuthUser = {
-  id: string;
-  username?: string;
-  email: string;
-  role: 'admin' | 'student' | 'customer';
-  name: string;
-
-  college?: string;
-  department?: string;
-  year?: string;
-  phone?: string;
-  rollnumber?: string;
-}
-
-export interface Product {
-  id: string;
-  name: string;
-  price: number;
-  category: string;
-  colors: string[];
-  image: string;
-  badge?: string;
-  description: string;
-  short_description?: string;
-  care?: string;
-  stock?: number;
-  is_available?: boolean;
-  featured?: boolean;
-  processing_time_days?: number;
-  processing_time?: string;
-  updated_at?: string;
-}
-
-export interface ProductWithImages extends Product {
-  product_images?: { image_id: string; image_url: string; display_order: number }[];
-  product_colors?: { color_id: string; color_name: string }[];
-}
-
-export type CartItem = {
-  productId: string;
-  color: string;
-  quantity: number;
-  id?: string;
-}
-
-export type PaymentStatus =
-  | 'pending'
-  | 'authorized'
-  | 'captured'
-  | 'failed'
-  | 'refunded';
-
-export type OrderLifecycleStatus =
-  | 'pending'
-  | 'payment_received'
-  | 'yarn_selected'
-  | 'crocheting'
-  | 'quality_check'
-  | 'ready'
-  | 'completed'
-  | 'cancelled';
-
-export interface Order {
-  id?: string;
-  order_id: string;
-  user_id: string;
-  total_price: number;
-  payment_status: PaymentStatus;
-  order_status: OrderLifecycleStatus;
-  razorpay_order_id?: string;
-  razorpay_payment_id?: string;
-  payment_method?: string;
-  ordered_at?: string;
-  updated_at?: string;
-  order_items?: OrderItem[];
-}
-
-export interface OrderItem {
-  id: string;
-  order_id: string;
-  product_id: string;
-  selected_color: string;
-  quantity: number;
-  price_at_purchase: number;
-  products?: Product;
-}
-
-export interface CustomRequest {
-  id: string;
-  user_id?: string;
-  name: string;
-  item_name: string;
-  occasion?: string;
-  colors?: string;
-  email?: string;
-  description?: string;
-  budget?: number;
-  status: CustomRequestStatus;
-  admin_price?: number;
-  admin_notes?: string;
-  student_response?: 'accepted' | 'declined';
-  created_at: string;
-  updated_at: string;
-}
-
-export type CustomRequestStatus =
-  | 'pending'
-  | 'accepted'
-  | 'rejected'
-  | 'counter_offered'
-  | 'student_accepted'
-  | 'paid'
-  | 'in_production'
-  | 'ready'
-  | 'completed';
-
-export type Navigate = (
-  target: Page,
-  data?: Record<string, string>
-) => void
-
-export interface AIAssistantMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  suggestions?: Product[];
-  needsFollowUp?: boolean;
-  followUpQuestion?: string;
-  timestamp: Date;
-}
+export type Page = 'home'|'catalog'|'product'|'dashboard'|'admin'|'add-product'|'past-creations'|'gallery'|'payment'|'about'|'cart'|'support'|'policy'|'custom-request';
+export type Navigate = (page: Page, data?: Record<string,string>) => void;
+export interface AuthUser { id:string; email:string; role:'admin'|'student'|'customer'; name:string; username?:string; college?:string; department?:string; year?:string; phone?:string; rollnumber?:string; }
+export interface Product { id:string; name:string; price:number; category:string; colors:string[]; image:string; images?:{url:string;alt:string}[]; description:string; short_description?:string; care?:string; stock?:number; is_available?:boolean; featured?:boolean; badge?:string; processing_time_days?:number; processing_time?:string; updated_at?:string; }
+export interface ProductWithImages extends Product { product_images?:{image_id:string;image_url:string;display_order:number}[]; product_colors?:{color_id:string;color_name:string}[]; }
+export interface CartItem { productId:string; color:string; quantity:number; id?:string; }
+export type PaymentStatus = 'pending'|'authorized'|'captured'|'failed'|'refunded';
+export type OrderLifecycleStatus = 'pending'|'payment_received'|'yarn_selected'|'crocheting'|'quality_check'|'ready'|'completed'|'collected'|'cancelled';
+export interface OrderEvent { id:string; status:OrderLifecycleStatus; note?:string; created_at:string; }
+export interface OrderItem { id:string; order_id:string; product_id:string; selected_color:string; quantity:number; price_at_purchase:number; processing_time_days?:number; item_status?:string; products?:Product; }
+export interface Order { id?:string; order_id:string; user_id:string; total_price:number; payment_status:PaymentStatus; order_status:OrderLifecycleStatus; razorpay_order_id?:string; razorpay_payment_id?:string; payment_method?:string; ordered_at?:string; updated_at?:string; completed_at?:string; order_items?:OrderItem[]; order_events?:OrderEvent[]; customer_snapshot?:Record<string,string>; pickup_location?:string; pickup_instructions?:string; tracking_note?:string; version:number; custom_request_id?:string; notifications?:NotificationJob[]; }
+export type CustomRequestStatus = 'pending'|'accepted'|'rejected'|'counter_offered'|'student_accepted'|'paid'|'in_production'|'ready'|'completed';
+export interface CustomRequest { id:string; user_id:string; name:string; email:string; item_name:string; description?:string; occasion?:string; colors?:string; budget?:number; reference_image?:string; status:CustomRequestStatus; admin_price?:number; admin_notes?:string; student_response?:'accepted'|'declined'; created_at:string; updated_at:string; version:number; }
+export interface NotificationJob { id:string; event_key:string; kind:string; recipient:string; status:'pending'|'sending'|'sent'|'failed'; attempts:number; last_error?:string; sent_at?:string; created_at:string; }
+export interface Creation { id:string; order_item_id:string; image_url?:string; caption?:string; is_public:boolean; product_name:string; selected_color:string; order_id:string; completed_at?:string; }
+export interface AIAssistantMessage { id:string; role:'user'|'assistant'; content:string; suggestions?:Product[]; needsFollowUp?:boolean; followUpQuestion?:string; timestamp:Date; }

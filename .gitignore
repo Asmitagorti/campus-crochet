@@ -47,3 +47,7 @@ next-env.d.ts
 # Environment secrets
 .env.local
 .env.*.local
+!.env.example
+.local-backups/
+scripts/database-schema.json
+scripts/lint-results.json

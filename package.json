@@ -6,15 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test scripts/auth.test.mjs scripts/cart.test.mjs scripts/models.test.mjs scripts/operations.test.mjs",
+    "db:check": "node scripts/check-db.cjs",
+    "db:migrate": "node scripts/migrate-db.cjs",
+    "email:check": "node scripts/check-email.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",
     "next": "16.2.11",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "resend": "^6.28.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

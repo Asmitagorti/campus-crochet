@@ -1,89 +1,21 @@
-import { createHmac, timingSafeEqual } from "crypto";
-import { supabase, getServiceRoleClient } from "@/lib/supabase";
-import { getSession } from "@/lib/auth";
-
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
-
-export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!RAZORPAY_KEY_SECRET) {
-    console.error("RAZORPAY_KEY_SECRET is not configured");
-    return Response.json(
-      { error: "Payment gateway not configured" },
-      { status: 503 }
-    );
-  }
-
-  const body = await request.json();
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, order_id } = body;
-
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !order_id) {
-    return Response.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  if (typeof razorpay_order_id !== "string" || typeof razorpay_payment_id !== "string" || typeof razorpay_signature !== "string" || typeof order_id !== "string") {
-    return Response.json({ error: "Invalid field types" }, { status: 400 });
-  }
-
-  const generatedSignature = createHmac("sha256", RAZORPAY_KEY_SECRET)
-    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-    .digest("hex");
-
-  const sigBuf = Buffer.from(razorpay_signature, "utf-8");
-  const genBuf = Buffer.from(generatedSignature, "utf-8");
-
-  if (sigBuf.length !== genBuf.length || !timingSafeEqual(sigBuf, genBuf)) {
-    console.error("RAZORPAY SIGNATURE MISMATCH");
-    return Response.json({ error: "Invalid signature" }, { status: 400 });
-  }
-
-  const db = getServiceRoleClient();
-  const { data: order, error: orderErr } = await db
-    .from("orders")
-    .select("order_id, user_id, payment_status, razorpay_order_id")
-    .eq("order_id", order_id)
-    .maybeSingle();
-
-  if (orderErr || !order) {
-    return Response.json(
-      { error: orderErr?.message ?? "Order not found" },
-      { status: 404 }
-    );
-  }
-
-  if (order.user_id !== session.id) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  if (order.razorpay_order_id && order.razorpay_order_id !== razorpay_order_id) {
-    return Response.json(
-      { error: "razorpay_order_id mismatch" },
-      { status: 400 }
-    );
-  }
-
-  if (order.payment_status === "captured") {
-    return Response.json({ success: true, message: "Payment already verified" });
-  }
-
-  const { error } = await db
-    .from("orders")
-    .update({
-      payment_status: "captured",
-      order_status: "payment_received",
-      razorpay_order_id,
-      razorpay_payment_id,
-    })
-    .eq("order_id", order_id);
-
-  if (error) {
-    console.error("ORDER UPDATE ERROR:", error);
-    return Response.json({ error: error.message }, { status: 500 });
-  }
-
-  return Response.json({ success: true, message: "Payment verified" });
+import {createHmac,timingSafeEqual} from 'node:crypto';
+import {requireSession} from '@/lib/auth';
+import {getServiceRoleClient} from '@/lib/server-db';
+import {failure,readBody,text,UUID,ApiError} from '@/lib/api';
+import {gateway,capturePayment,type GatewayPayment} from '@/lib/razorpay';
+export async function POST(request:Request){
+ try{const u=await requireSession(),b=await readBody(request),secret=process.env.RAZORPAY_KEY_SECRET;
+ if(!secret)throw new ApiError('Payment gateway is not configured',503);
+ const oid=text(b.order_id),rz=text(b.razorpay_order_id),pid=text(b.razorpay_payment_id),sig=text(b.razorpay_signature);
+ if(!UUID.test(oid)||!/^order_[A-Za-z0-9]+$/.test(rz)||!/^pay_[A-Za-z0-9]+$/.test(pid)||!/^[a-f0-9]{64}$/i.test(sig))throw new ApiError('Invalid payment reference');
+ const {data:o,error}=await getServiceRoleClient().from('orders').select('user_id,razorpay_order_id').eq('order_id',oid).single();
+ if(error)throw error;if(o.user_id!==u.id)throw new ApiError('Access denied',403);
+ if(o.razorpay_order_id!==rz)throw new ApiError('Payment is not linked to this order');
+ const expected=createHmac('sha256',secret).update(`${rz}|${pid}`).digest('hex');
+ if(!timingSafeEqual(Buffer.from(expected),Buffer.from(sig)))throw new ApiError('Invalid payment signature');
+ const p=await gateway<GatewayPayment>(`/payments/${pid}`);
+ if(p.order_id!==rz)throw new ApiError('Payment reference mismatch');
+ const saved=await capturePayment(p);if(saved!==oid)throw new ApiError('Payment reference mismatch');
+ return Response.json({success:true});
+ }catch(e){return failure(e);}
 }
