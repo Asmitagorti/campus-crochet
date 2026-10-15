@@ -1,6 +1,6 @@
 export type Page = 'home'|'catalog'|'product'|'dashboard'|'admin'|'add-product'|'past-creations'|'gallery'|'payment'|'about'|'cart'|'support'|'policy'|'custom-request';
 export type Navigate = (page: Page, data?: Record<string,string>) => void;
-export interface AuthUser { id:string; email:string; role:'admin'|'student'|'customer'; name:string; username?:string; college?:string; department?:string; year?:string; phone?:string; rollnumber?:string; }
+export interface AuthUser { id:string; email:string; role:'admin'|'student'|'customer'; name:string; username?:string; college?:string; department?:string; year?:string; phone?:string; rollnumber?:string; branch?:string; }
 export interface Product { id:string; name:string; price:number; category:string; colors:string[]; image:string; images?:{url:string;alt:string}[]; description:string; short_description?:string; care?:string; stock?:number; is_available?:boolean; featured?:boolean; badge?:string; processing_time_days?:number; processing_time?:string; updated_at?:string; }
 export interface ProductWithImages extends Product { product_images?:{image_id:string;image_url:string;display_order:number}[]; product_colors?:{color_id:string;color_name:string}[]; }
 export interface CartItem { productId:string; color:string; quantity:number; id?:string; }
