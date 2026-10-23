@@ -4,7 +4,7 @@
 
 Only Google-issued, verified Firebase users can place orders. Customers cannot grant themselves roles. The single admin requires both an Admin SDK custom claim and a matching singleton UID. The server verifies Firebase tokens (including revocation) before privileged operations. Firestore rules deny all browser writes to roles, products, stock, orders, payment ownership, messages and internal records. Browser access does not bypass the server checks.
 
-Prices are read from Firestore on the server and checked again in the reservation transaction. Amounts are integer INR paise. Payment signatures use timing-safe comparison, and the server checks the payment's order, currency, amount and captured status with Razorpay. Webhook signatures are checked over the raw body.
+Prices are read from Firestore on the server and checked again in the reservation transaction. Amounts are integer INR paise. Payment signatures use timing-safe comparison, and the server checks the payment's order, currency, amount and captured status with Razorpay.
 
 Product/content editors use revision checks to reject stale writes. Stock reservation and release also increment product revisions, so an older admin form cannot overwrite a concurrent purchase's stock change.
 

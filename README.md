@@ -45,5 +45,4 @@ See `docs/production-setup.md`, `docs/security-and-transactions.md` and `firesto
 
 ## Launch scope
 
-Campus pickup is the only fulfilment option, with no delivery charge. Automatic outbound email/WhatsApp notifications and carrier shipping are not connected. Messages are visible in the studio. Use test Razorpay keys during review, then switch to live keys, set the production origin, configure the signed webhook, deploy Firestore rules and run the production payment smoke test.
-
+Campus pickup is the only fulfilment option, with no delivery charge. Automatic outbound email/WhatsApp notifications and carrier shipping are not connected. Messages are visible in the studio. Use test Razorpay keys during review, then switch to live keys, set the production origin, deploy Firestore rules and run the production payment smoke test.

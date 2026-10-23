@@ -15,7 +15,6 @@ const privateKey = process.env.FIREBASE_ADMIN_JSON
 const secrets = [
   process.env.RAZORPAY_KEY_SECRET,
   process.env.CLOUDINARY_API_SECRET,
-  process.env.RAZORPAY_WEBHOOK_SECRET,
   privateKey,
 ].filter(Boolean);
 let found = 0;

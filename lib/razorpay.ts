@@ -68,7 +68,7 @@ export async function confirmPayment(
         { method: "POST", body: JSON.stringify({ amount, currency: "INR" }) },
       );
     } catch (error) {
-      // The callback and webhook can race to capture the same payment.
+      // Verification retries and reconciliation can race to capture the same payment.
       const latest = await gateway<GatewayPayment>(
         `payments/${encodeURIComponent(paymentId)}`,
       );

@@ -14,13 +14,12 @@ The integration uses the Orders API on the server, integer paise amounts and cur
 
 1. Keep test keys for testing. Replace `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` with live keys only for the production environment; never prefix the secret with `NEXT_PUBLIC_`.
 2. Set `SITE_ORIGIN` to the exact HTTPS production origin.
-3. Create a Razorpay webhook pointing to `https://YOUR-DOMAIN/api/payments/webhook` for `payment.captured` and `order.paid`. Use the same strong value as the server's `RAZORPAY_WEBHOOK_SECRET`. A value has been generated in the ignored local environment file; configure a production value in your host and the Razorpay Dashboard.
-4. Run a successful and failed payment smoke test, verify the matching order in the studio, then verify pickup/fulfilment handling.
-5. Do not mix test and live orders in one Firestore project for a real launch. Use a separate production project/database or archive/remove test records after review and before accepting live customers.
+3. Run a successful and failed payment smoke test, verify the matching order in the studio, then verify pickup/fulfilment handling.
+4. Do not mix test and live orders in one Firestore project for a real launch. Use a separate production project/database or archive/remove test records after review and before accepting live customers.
 
 ## Scheduled reconciliation
 
-Stock is reserved transactionally before a payment order is created. The browser releases unpaid reservations after a verified cancellation. To handle closed tabs or a missing callback, schedule `/api/cron/reconcile` with your hosting scheduler with `Authorization: Bearer CRON_SECRET`. The handler checks Razorpay before releasing expired reservations and confirms captured/authorised payments. `vercel.json` uses one daily invocation at 00:00 UTC, compatible with Vercel Hobby. This is around 05:30 IST, with Vercel Hobby timing flexibility. Abandoned reservations may therefore remain held until the next daily cleanup. Payment webhooks and verified browser cancellations still update orders immediately. If faster cleanup is needed, use a hosting plan that supports more frequent jobs or an independently configured authenticated scheduler. Without this job, abandoned reservations remain held until reconciled; this avoids silently selling stock committed to an unresolved payment.
+Stock is reserved transactionally before a payment order is created. The browser releases unpaid reservations after a verified cancellation. To handle closed tabs or a missing callback, schedule `/api/cron/reconcile` with your hosting scheduler with `Authorization: Bearer CRON_SECRET`. The handler checks Razorpay before releasing expired reservations and confirms captured/authorised payments. `vercel.json` uses one daily invocation at 00:00 UTC, compatible with Vercel Hobby. This is around 05:30 IST, with Vercel Hobby timing flexibility. Abandoned reservations may therefore remain held until the next daily cleanup. Successful browser verification and verified browser cancellations update orders immediately. If a browser closes before verification completes, payment status is recovered by reconciliation. If faster cleanup is needed, use a hosting plan that supports more frequent jobs or an independently configured authenticated scheduler. Without this job, abandoned reservations remain held until reconciled; this avoids silently selling stock committed to an unresolved payment.
 
 Do not configure Firestore TTL on payment reservations: releasing stock must be a transaction after checking payment state, not a raw document deletion.
 
@@ -32,7 +31,7 @@ Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and secret-managed `CLOU
 
 - Confirm the proposed INR prices, exact product measurements and material descriptions in the studio.
 - Sign in with the designated Google account to finish the admin binding and exercise the authenticated studio and checkout in the real browser.
-- Publish the supplied Firestore rules, set production secrets and webhook, and activate reconciliation.
+- Publish the supplied Firestore rules, set production secrets, and activate reconciliation.
 - Check the pages on real mobile and desktop browsers. Automated browser visual verification was blocked by the local preview's browser access policy during implementation.
 - Review store policies and customer-facing fulfilment details for your launch.
 
@@ -43,4 +42,3 @@ The application is built and connected locally. No production site deployment, l
 The ignored `.env.local` now contains the complete service-account object in `FIREBASE_ADMIN_JSON`, encoded as single-line JSON. The application no longer reads a local JSON file path.
 
 For a hosting dashboard, copy only the JSON value into the server-side `FIREBASE_ADMIN_JSON` environment variable; omit the surrounding dotenv single quotes. Keep the private key's JSON `\n` escapes intact. Do not use a `NEXT_PUBLIC_` prefix. Restart or redeploy after changing production environment variables.
-

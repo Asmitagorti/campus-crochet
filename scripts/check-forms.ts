@@ -30,16 +30,6 @@ async function main() {
     await doc.delete();
     console.log("Temporary contact message removed.");
   }
-  const webhook = await fetch("http://localhost:3000/api/payments/webhook", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-razorpay-signature": "0".repeat(64),
-    },
-    body: "{}",
-  });
-  assert.equal(webhook.status, 400);
-  console.log("PASS: unsigned/forged webhook cannot confirm a payment.");
   const orders = await fetch("http://localhost:3000/api/orders", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
