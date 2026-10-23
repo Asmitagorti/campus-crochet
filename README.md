@@ -37,6 +37,7 @@ See `docs/production-setup.md`, `docs/security-and-transactions.md` and `firesto
 
 ## Verification
 
+- `npm run check:firebase-runtime` checks Firebase Auth imports and JWKS signature verification without Node's optional CommonJS-to-ESM loading support.
 - `npm run typecheck`
 - `npm run build`
 - `node scripts/check-http.mjs` against a running local server

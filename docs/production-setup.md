@@ -39,6 +39,8 @@ The application is built and connected locally. No production site deployment, l
 
 ### Firebase credential value
 
+The project targets Node.js 24.x on Vercel. A scoped dependency override keeps `jwks-rsa` on CommonJS-compatible `jose` 5.10.0: its current synchronous `require('jose')` otherwise fails on hosts that disable `require(ESM)`. Keep the lockfile in deployments and run `npm run check:firebase-runtime` when updating Firebase authentication dependencies.
+
 The ignored `.env.local` now contains the complete service-account object in `FIREBASE_ADMIN_JSON`, encoded as single-line JSON. The application no longer reads a local JSON file path.
 
 For a hosting dashboard, copy only the JSON value into the server-side `FIREBASE_ADMIN_JSON` environment variable; omit the surrounding dotenv single quotes. Keep the private key's JSON `\n` escapes intact. Do not use a `NEXT_PUBLIC_` prefix. Restart or redeploy after changing production environment variables.
