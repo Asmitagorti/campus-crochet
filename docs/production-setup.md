@@ -37,9 +37,17 @@ Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and secret-managed `CLOU
 
 The application is built and connected locally. No production site deployment, live payment or automatic rules publication has been performed.
 
-### Firebase credential value
+### Browser security configuration
+
+`next.config.ts` applies MIME-sniffing and framing protection, referrer and permissions policies, popup-compatible COOP, production-only one-year HSTS, and private/no-store API responses. Framework identification and production browser source maps are disabled. HSTS intentionally omits preload and includeSubDomains so deploying this app does not commit other subdomains to HTTPS.
+
+`proxy.ts` issues a fresh CSP script nonce for each page request and forwards the policy to Next's renderer. Checkout forwards the nonce to the Razorpay script. Production permits neither inline scripts without a nonce nor eval. Inline styles remain permitted for Motion and checkout styling. Cloudinary images, Google authentication and Razorpay have explicit resource allowances. HTTPS upgrades are production-only; local development retains hot reload support. Keep the root layout dynamically rendered when using nonces.
+
+Run `node scripts/check-security-headers.mjs` against a production server on port 3003 (or set `TEST_ORIGIN`) to verify response headers, unique nonces, script nonce coverage, and API caching. An interactive Google sign-in and Razorpay test checkout remain required before launch; HTTP tests cannot verify third-party popup behavior.
 
 The project targets Node.js 24.x on Vercel. A scoped dependency override keeps `jwks-rsa` on CommonJS-compatible `jose` 5.10.0: its current synchronous `require('jose')` otherwise fails on hosts that disable `require(ESM)`. Keep the lockfile in deployments and run `npm run check:firebase-runtime` when updating Firebase authentication dependencies.
+
+### Firebase credential value
 
 The ignored `.env.local` now contains the complete service-account object in `FIREBASE_ADMIN_JSON`, encoded as single-line JSON. The application no longer reads a local JSON file path.
 

@@ -56,7 +56,13 @@ declare global {
     };
   }
 }
-export default function Checkout({ testMode }: { testMode: boolean }) {
+export default function Checkout({
+  testMode,
+  nonce,
+}: {
+  testMode: boolean;
+  nonce?: string;
+}) {
   const { cart, setQuantity, ready, catalog, stocks } = useShop(),
     { user, login, token, error: authError } = useAuth(),
     params = useSearchParams(),
@@ -303,6 +309,7 @@ export default function Checkout({ testMode }: { testMode: boolean }) {
   return (
     <main className="page-wrap checkout-page">
       <Script
+        nonce={nonce}
         src="https://checkout.razorpay.com/v1/checkout.js"
         onReady={() => setScriptReady(true)}
         onError={() =>
