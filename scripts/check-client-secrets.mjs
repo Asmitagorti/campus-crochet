@@ -9,9 +9,9 @@ async function files(dir) {
   }
   return result;
 }
-const privateKey = JSON.parse(
-  await readFile(process.env.GOOGLE_APPLICATION_CREDENTIALS, "utf8"),
-).private_key;
+const privateKey = process.env.FIREBASE_ADMIN_JSON
+  ? JSON.parse(process.env.FIREBASE_ADMIN_JSON).private_key
+  : undefined;
 const secrets = [
   process.env.RAZORPAY_KEY_SECRET,
   process.env.CLOUDINARY_API_SECRET,

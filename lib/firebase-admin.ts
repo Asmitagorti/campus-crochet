@@ -7,7 +7,6 @@ import {
 } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync } from "node:fs";
 export function adminApp() {
   return (
     getApps()[0] ||
@@ -15,16 +14,7 @@ export function adminApp() {
       projectId: process.env.FIREBASE_PROJECT_ID || "college-corchet",
       credential: process.env.FIREBASE_ADMIN_JSON
         ? cert(JSON.parse(process.env.FIREBASE_ADMIN_JSON))
-        : process.env.GOOGLE_APPLICATION_CREDENTIALS
-          ? cert(
-              JSON.parse(
-                readFileSync(
-                  process.env.GOOGLE_APPLICATION_CREDENTIALS,
-                  "utf8",
-                ),
-              ),
-            )
-          : applicationDefault(),
+        : applicationDefault(),
     })
   );
 }

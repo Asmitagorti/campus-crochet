@@ -20,7 +20,7 @@ The integration uses the Orders API on the server, integer paise amounts and cur
 
 ## Scheduled reconciliation
 
-Stock is reserved transactionally before a payment order is created. The browser releases unpaid reservations after a verified cancellation. To handle closed tabs or a missing callback, schedule `/api/cron/reconcile` at least every 15 minutes with `Authorization: Bearer CRON_SECRET`. The handler checks Razorpay before releasing expired reservations and confirms captured/authorised payments. `vercel.json` supplies the route schedule for Vercel; frequent cron support depends on the hosting plan. Other hosts should configure an equivalent scheduled HTTP request. Without this job, abandoned reservations remain held until reconciled; this avoids silently selling stock committed to an unresolved payment.
+Stock is reserved transactionally before a payment order is created. The browser releases unpaid reservations after a verified cancellation. To handle closed tabs or a missing callback, schedule `/api/cron/reconcile` with your hosting scheduler with `Authorization: Bearer CRON_SECRET`. The handler checks Razorpay before releasing expired reservations and confirms captured/authorised payments. `vercel.json` uses one daily invocation at 00:00 UTC, compatible with Vercel Hobby. This is around 05:30 IST, with Vercel Hobby timing flexibility. Abandoned reservations may therefore remain held until the next daily cleanup. Payment webhooks and verified browser cancellations still update orders immediately. If faster cleanup is needed, use a hosting plan that supports more frequent jobs or an independently configured authenticated scheduler. Without this job, abandoned reservations remain held until reconciled; this avoids silently selling stock committed to an unresolved payment.
 
 Do not configure Firestore TTL on payment reservations: releasing stock must be a transaction after checking payment state, not a raw document deletion.
 
@@ -37,3 +37,10 @@ Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and secret-managed `CLOU
 - Review store policies and customer-facing fulfilment details for your launch.
 
 The application is built and connected locally. No production site deployment, live payment or automatic rules publication has been performed.
+
+### Firebase credential value
+
+The ignored `.env.local` now contains the complete service-account object in `FIREBASE_ADMIN_JSON`, encoded as single-line JSON. The application no longer reads a local JSON file path.
+
+For a hosting dashboard, copy only the JSON value into the server-side `FIREBASE_ADMIN_JSON` environment variable; omit the surrounding dotenv single quotes. Keep the private key's JSON `\n` escapes intact. Do not use a `NEXT_PUBLIC_` prefix. Restart or redeploy after changing production environment variables.
+

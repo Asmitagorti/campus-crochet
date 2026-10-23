@@ -1,13 +1,11 @@
-import { initializeApp, cert } from "firebase-admin/app";
+import { initializeApp, cert, applicationDefault } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
-import { readFile } from "node:fs/promises";
 const app = initializeApp({
-    credential: cert(
-      JSON.parse(
-        await readFile(process.env.GOOGLE_APPLICATION_CREDENTIALS, "utf8"),
-      ),
-    ),
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    credential: process.env.FIREBASE_ADMIN_JSON
+      ? cert(JSON.parse(process.env.FIREBASE_ADMIN_JSON))
+      : applicationDefault(),
   }),
   db = getFirestore(app);
 try {

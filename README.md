@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-`npm run build` creates the production build; `npm start` runs it. No credentials are committed. The local service-account file is read from its configured path; production must use a secret-managed `FIREBASE_ADMIN_JSON` value or Google Application Default Credentials.
+`npm run build` creates the production build; `npm start` runs it. No credentials are committed. Firebase Admin credentials are loaded from `FIREBASE_ADMIN_JSON` in the ignored environment file. Set the same server-only variable in production, or use Google Application Default Credentials. No local service-account file path is required.
 
 ## Pages and functionality
 
@@ -46,3 +46,4 @@ See `docs/production-setup.md`, `docs/security-and-transactions.md` and `firesto
 ## Launch scope
 
 Campus pickup is the only fulfilment option, with no delivery charge. Automatic outbound email/WhatsApp notifications and carrier shipping are not connected. Messages are visible in the studio. Use test Razorpay keys during review, then switch to live keys, set the production origin, configure the signed webhook, deploy Firestore rules and run the production payment smoke test.
+
