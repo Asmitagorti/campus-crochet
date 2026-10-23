@@ -19,6 +19,14 @@ export async function POST(request: Request) {
         });
         isAdmin = true;
       }
+      if (
+        record.exists &&
+        record.data()?.uid === null &&
+        record.data()?.email === token.email?.toLowerCase()
+      ) {
+        tx.update(config, { uid: token.uid, boundAt: new Date().toISOString() });
+        isAdmin = true;
+      }
       if (!user.exists)
         tx.create(profile, {
           uid: token.uid,
