@@ -1,27 +1,48 @@
 # Campus-Crochet
 
-A responsive landing page built with Next.js App Router, TypeScript, Tailwind CSS 4, Motion and Lucide icons.
+A dynamic Next.js App Router storefront with TypeScript, Tailwind CSS 4, Motion, Firebase Google authentication, Firestore, Cloudinary images and Razorpay checkout in INR.
 
-## Run locally
+## Run
+
+Use Node.js 24 or a supported Node.js LTS runtime. Copy `.env.example` to `.env.local` and configure server credentials. Then run:
 
 ```sh
 npm install
 npm run dev
 ```
 
-Visit http://localhost:3000. Validate with `npm run build` and `npm run typecheck`.
+`npm run build` creates the production build; `npm start` runs it. No credentials are committed. The local service-account file is read from its configured path; production must use a secret-managed `FIREBASE_ADMIN_JSON` value or Google Application Default Credentials.
 
-## Design
+## Pages and functionality
 
-Warm parchment #FBF0DA, cream #FFF8E9, cocoa #603B25, toasted brown #87502C, blush #EFD2C9 and lavender #DCD0E5. Caveat provides handwritten headings; Nunito Sans keeps small text legible. Dark mode uses warm espresso surfaces and cream text. Theme, favourites and the preview bag are stored locally.
+- `/shop`: live Firestore catalogue, collection filtering, search, sorting, stock filter and saved favourites.
+- `/products/[slug]`: individual product photos, INR price, availability, quantity, buy-now checkout, description, specifications and care.
+- `/about`, `/contact`, `/journey`, `/journey/[slug]`: studio story, persisted enquiries, WhatsApp/call links and editable published chapters.
+- `/account`: Google sign-in, order history and favourites. New users are customers by default.
+- `/checkout`: server-priced INR checkout with Razorpay, stock reservations and payment recovery.
+- `/studio`: private administrator workspace for product creation/editing, Cloudinary uploads, stock, publishing, order fulfilment, messages, Journey and site content.
+- `/privacy`: data and payment handling information.
 
-The reference guides the scrapbook composition, paper edges, handwritten headings, photo frames, soft colours and section order. Original product photography is retained in public/images; Raw_Pictures remains untouched. Product names are editorial working names. No unverified prices, testimonials, shipping or safety claims are published. The care section occupies the testimonial composition until real reviews are available.
+Theme and bag persist locally. Signed-in favourites persist in Firestore. Storefront content is server-rendered from Firestore; the client refreshes stock/content on navigation, focus and at 30-second intervals. Shared design retains the original parchment, cocoa, blush and lavender theme; category and product grids use two columns on small screens.
 
-## Scope
+## Data and setup
 
-This is the landing-page phase. Search, category filtering, favourites, photo previews and bag quantities work locally. No backend, payment, order submission, newsletter service or social account is connected. Bag content explicitly explains that pricing and ordering are forthcoming.
+`npm run bootstrap` inserts only missing products, initial stock of 25 per product, the three Journey entries and site content. It never resets existing stock. Initial catalogue prices are proposed launch prices and are editable in the studio.
 
-## Accessibility and responsiveness
+All 15 current site photos are hosted on Cloudinary; the manifest is in `lib/media-map.json`. Originals remain in the repository. Admin uploads are server-authorised and sent to Cloudinary using server-only credentials.
 
-Responsive breakpoints at 1100, 800 and 580 pixels; mobile navigation; labelled controls; visible keyboard focus; Escape closes overlays; reduced-motion preference respected. Phone layout uses stacked hero content, two-column category and product grids.
+The single administrator is bound to the verified Google address configured as `ADMIN_EMAIL`. The first sign-in creates `admin_config/singleton` transactionally and adds the Admin SDK custom claim. Both the claim and singleton UID must match for admin access. Changing a browser profile or a role field cannot grant administrator rights. No public admin signup endpoint exists.
 
+See `docs/production-setup.md`, `docs/security-and-transactions.md` and `firestore.rules` before launch.
+
+## Verification
+
+- `npm run typecheck`
+- `npm run build`
+- `node scripts/check-http.mjs` against a running local server
+- `npm run check:transactions` uses isolated temporary Firestore fixtures and an unpaid Razorpay test order. No payment is made; fixture records are cleaned up.
+- `npx --yes --package firebase-tools firebase emulators:exec --only firestore --project demo-campus-crochet --config firebase.test.json "node --import tsx scripts/check-rules-emulator.ts"` runs 15 security rule cases without touching production rules.
+
+## Launch scope
+
+Campus pickup is the only fulfilment option, with no delivery charge. Automatic outbound email/WhatsApp notifications and carrier shipping are not connected. Messages are visible in the studio. Use test Razorpay keys during review, then switch to live keys, set the production origin, configure the signed webhook, deploy Firestore rules and run the production payment smoke test.

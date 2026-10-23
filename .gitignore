@@ -4,3 +4,11 @@ out/
 .env*
 
 *.tsbuildinfo
+
+.data/
+
+!.env.example
+.data/
+firestore-debug.log
+firebase-debug.log
+ui-debug.log

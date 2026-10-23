@@ -1,0 +1,24 @@
+{
+  "suite": "firestore.rules",
+  "environment": "isolated Firebase emulator: demo-campus-crochet",
+  "passed": 15,
+  "failed": 0,
+  "published": false,
+  "checks": [
+    "published product public",
+    "hidden product private",
+    "guest order denied",
+    "own order allowed",
+    "cross-customer order denied",
+    "stock write denied",
+    "role escalation denied",
+    "forged paid order denied",
+    "false singleton admin denied",
+    "sole matching admin read allowed",
+    "admin browser write denied",
+    "guest messages denied",
+    "admin registry write denied",
+    "published journey public",
+    "draft journey private"
+  ]
+}

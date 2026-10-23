@@ -1,64 +1,406 @@
 "use client";
-import { useEffect, useState } from "react";
-import { motion, MotionConfig } from "motion/react";
-import { Heart, ShoppingBag, Search, Sun, Moon, Menu, X, ArrowRight, Leaf, Gift, HandHeart, Scissors, Minus, Plus, Check } from "lucide-react";
-
-const photo = (id: string) => ["tulips","bunny","coaster","beanie","pastel-bag"].includes(id) ? `/images/${id}-clean.png` : `/images/${id}.jpg`;
-type Product = { id: string; name: string; category: string; note: string };
-const products: Product[] = [
- {id:"stitch",name:"A little blue bestie",category:"Crochet Toys",note:"A pocketful of personality"},
- {id:"coaster",name:"Coffee & a little comfort",category:"Rugs & Mats",note:"For your favourite cup"},
- {id:"bunny",name:"Strawberry bunny",category:"Keychains & Charms",note:"The sweetest little companion"},
- {id:"minion",name:"Your sunshine sidekick",category:"Crochet Toys",note:"Small friend, big energy"},
- {id:"tulips",name:"Blooms that stay",category:"Home Decor",note:"A little forever kind of gift"},
- {id:"beanie",name:"Golden hour beanie",category:"Accessories",note:"Something soft for cooler days"},
- {id:"flowers",name:"Made-for-you gifting",category:"Gift Sets",note:"Thoughtfulness, stitched in"},
- {id:"bag",name:"Everyday blue tote",category:"Accessories",note:"Take a little handmade with you"},
-];
-const categories=[{name:"Crochet Toys",image:"stitch"},{name:"Rugs & Mats",image:"coaster"},{name:"Keychains & Charms",image:"bunny"},{name:"Accessories",image:"pastel-bag"},{name:"Home Decor",image:"tulips"},{name:"Gift Sets",image:"flowers"}];
-function Yarn({className=""}:{className?:string}) {return <svg className={className} viewBox="0 0 72 72" fill="none" aria-hidden="true"><circle cx="34" cy="33" r="24"/><path d="M14 18c28 0 42 20 40 32M11 27c22-4 37 11 40 27M11 37c16-4 27 4 34 19M18 12c-3 19 7 34 25 44M28 9c-8 20-3 37 7 48M39 10c-17 12-23 29-19 43M49 16c-20 7-31 17-36 29M55 27C34 26 21 35 16 47M51 54c14 6 17-4 11-8M10 57L63 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>}
-function Sprig({className=""}:{className?:string}){return <svg className={className} viewBox="0 0 100 160" fill="none" aria-hidden="true"><path d="M47 154C40 111 61 74 50 11" stroke="currentColor" strokeWidth="2"/><path d="M48 129C16 126 7 103 14 90c25 0 35 16 34 39ZM48 106c30-4 46-23 40-39-23 1-37 16-40 39ZM51 78C21 75 16 55 22 42c20 4 31 17 29 36ZM52 54C73 49 85 29 77 16 57 23 49 39 52 54ZM50 31C33 21 32 8 39 2c14 6 17 17 11 29Z" fill="currentColor" opacity=".8"/><path d="M46 124L18 96m33 3 29-25M49 70 26 47m28-1 20-24" stroke="var(--paper)" strokeWidth="1" opacity=".55"/></svg>}
-function Title({children,sub}:{children:React.ReactNode;sub:string}){return <div className="section-title"><h2><span>♡</span> {children} <span>♡</span></h2><p>{sub}</p></div>}
-const reveal={initial:{opacity:0,y:22},whileInView:{opacity:1,y:0},viewport:{once:true,amount:.12},transition:{duration:.6}};
-export default function Home(){
- const [showAll,setShowAll]=useState(false),[dark,setDark]=useState(false),[menu,setMenu]=useState(false),[query,setQuery]=useState(""),[category,setCategory]=useState("All"),[liked,setLiked]=useState<string[]>([]),[onlyLiked,setOnlyLiked]=useState(false),[cart,setCart]=useState<Record<string,number>>({}),[cartOpen,setCartOpen]=useState(false),[selected,setSelected]=useState<Product|null>(null),[notice,setNotice]=useState("");
- useEffect(()=>{setDark(localStorage.getItem("campus-theme")==="dark");try{setCart(JSON.parse(localStorage.getItem("campus-bag")||"{}"));setLiked(JSON.parse(localStorage.getItem("campus-hearts")||"[]"))}catch{}},[]);
- useEffect(()=>{document.documentElement.dataset.theme=dark?"dark":"light";localStorage.setItem("campus-theme",dark?"dark":"light")},[dark]);
- useEffect(()=>{localStorage.setItem("campus-bag",JSON.stringify(cart))},[cart]);
- useEffect(()=>{localStorage.setItem("campus-hearts",JSON.stringify(liked))},[liked]);
- useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(""),3000);return()=>clearTimeout(t)},[notice]);
- useEffect(()=>{const close=(e:KeyboardEvent)=>{if(e.key==="Escape"){setCartOpen(false);setSelected(null);setMenu(false)}};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close)},[]);
- useEffect(()=>{if(!cartOpen&&!selected)return; const previous=document.activeElement as HTMLElement|null; const overflow=document.body.style.overflow; document.body.style.overflow="hidden";const trap=(e:KeyboardEvent)=>{if(e.key!=="Tab")return;const dialog=document.querySelector('[role="dialog"]');const focusable=dialog?.querySelectorAll<HTMLElement>('button,a[href],input');if(!focusable?.length)return;const first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}};document.addEventListener("keydown",trap);return()=>{document.body.style.overflow=overflow;document.removeEventListener("keydown",trap);previous?.focus()}},[cartOpen,selected]);
- const toggleLike=(id:string)=>setLiked(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id]);
- const add=(id:string)=>{setCart(v=>({...v,[id]:(v[id]||0)+1}));setNotice("A little happiness added to your bag ♡")};
- const count=Object.values(cart).reduce((a,b)=>a+b,0);
- const visible=products.filter(p=>(category==="All"||p.category===category)&&(!onlyLiked||liked.includes(p.id))&&`${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase()));
- function browse(name="All"){setCategory(name);setOnlyLiked(false);setMenu(false);document.getElementById("collection")?.scrollIntoView({behavior:"smooth"})}
- return <MotionConfig reducedMotion="user"><div className="site-shell">
- <div className="announcement">A little yarn. A lot of love. <Heart size={11}/> Handmade on campus, just for you.</div>
- <header><a className="brand" href="#home" aria-label="Campus-Crochet home"><Yarn/><span>campus-Crochet</span></a><nav className={menu?"open":""} aria-label="Main navigation">{["Home","Shop","About","Contact"].map((n,i)=><a key={n} href={["#home","#collection","#story","#contact"][i]} onClick={()=>setMenu(false)}>{n}</a>)}</nav><div className="header-actions"><label className="search"><input aria-label="Search handmade products" placeholder="Search cute things..." value={query} onChange={e=>{setQuery(e.target.value);document.getElementById("collection")?.scrollIntoView({behavior:"smooth"})}}/><Search size={16}/></label><button className="icon-button theme" aria-label={dark?"Switch to light theme":"Switch to dark theme"} onClick={()=>setDark(!dark)}>{dark?<Sun/>:<Moon/>}</button><button className={`icon-button ${onlyLiked?"active":""}`} aria-label="Show favourites" onClick={()=>{setOnlyLiked(!onlyLiked);setCategory("All");document.getElementById("collection")?.scrollIntoView({behavior:"smooth"})}}><Heart/></button><button className="icon-button bag-button" aria-label={`Open bag, ${count} items`} onClick={()=>setCartOpen(true)}><ShoppingBag/><span>{count}</span></button><button className="icon-button mobile-menu" aria-label="Toggle navigation" aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></div></header>
- <main id="home">
- <section className="hero"><div className="hero-photo" role="img" aria-label="Warm crochet craft studio"/><div className="hero-product"><img src="/images/stitch.jpg" alt="The original handmade blue crochet plush"/><span>your new little bestie ♡</span></div><img className="hero-blooms" src="/images/tulips-clean.png" alt="" aria-hidden="true"/><div className="hero-paper"><motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{duration:.8}}><div className="eyebrow">Handmade with love <span>♡</span></div><h1>Tiny stitches,<br/>Big smiles <span>♡</span></h1><p>Adorable crochet keepsakes, made by hand,<br className="desktop-br"/> for real moments. Real yarn. Real character.<br className="desktop-br"/> Just pure, handmade cuteness.</p><button className="stitch-button" onClick={()=>browse()}>Shop the collection <ArrowRight size={17}/></button><div className="hero-footnote"><Scissors size={15}/> Slowly made. Wholeheartedly loved.</div></motion.div><span className="doodle hero-heart">♡</span><Sprig className="sprig"/></div><div className="hero-note">Real<br/>Handmade<br/>Real Joy ♡<span>⤹</span></div></section>
- <section className="promise-strip" aria-label="Our promises">{[{icon:HandHeart,title:"100% Handmade",text:"with love & care"},{icon:Leaf,title:"Beautiful Yarn",text:"soft, tactile & full of character"},{icon:ShoppingBag,title:"Campus Beginnings",text:"a little closer to home"},{icon:Heart,title:"Little One-of-a-kinds",text:"just like the people you love"}].map(({icon:Icon,title,text})=><div key={title}><Icon/><p><strong>{title}</strong><span>{text}</span></p></div>)}</section>
- <motion.section {...reveal} className="categories section-wrap"><Sprig className="corner-doodle"/><Title sub="Little pieces of happiness, sorted for you.">Explore Our Collection</Title><div className="category-grid">{categories.map((c,i)=><button className="category-card" key={c.name} onClick={()=>browse(c.name)} style={{"--tilt":`${i%2?1:-1}deg`} as React.CSSProperties}><div className="photo-frame"><img src={photo(c.image)} alt={c.name} loading="lazy"/></div><h3>{c.name}</h3><span className="mini-button">View all <ArrowRight size={10}/></span></button>)}</div></motion.section>
- <motion.section {...reveal} className="featured section-wrap" id="collection"><Title sub="Handpicked favourites, made to melt hearts.">Featured Collection</Title><div className="filter-row"><button className={category==="All"&&!onlyLiked?"selected":""} onClick={()=>{setCategory("All");setOnlyLiked(false);setQuery("")}}>All the little things</button>{category!=="All"&&<button className="selected" onClick={()=>setCategory("All")}>{category} <X size={12}/></button>}{onlyLiked&&<button className="selected" onClick={()=>setOnlyLiked(false)}>Your favourites <X size={12}/></button>}<span>Made slowly. Meant to stay.</span></div><div className="product-grid">{visible.slice(0,category==="All"&&!query&&!onlyLiked&&!showAll?5:8).map((p,i)=><motion.article className="product-card" key={p.id} layout style={{"--tilt":`${i%2?1:-1}deg`} as React.CSSProperties}><div className="product-image"><button className="image-open" aria-label={`View ${p.name}`} onClick={()=>setSelected(p)}><img src={photo(p.id)} alt={p.name} loading="lazy"/></button><button className={`favourite ${liked.includes(p.id)?"is-liked":""}`} aria-label={`${liked.includes(p.id)?"Unsave":"Save"} ${p.name}`} aria-pressed={liked.includes(p.id)} onClick={()=>toggleLike(p.id)}><Heart size={19}/></button></div><button className="product-name" onClick={()=>setSelected(p)}>{p.name}</button><p>{p.note}</p><span className="price-note">Small batch · Handmade</span><button className="small-button" onClick={()=>add(p.id)}>Add to bag <Plus size={12}/></button></motion.article>)}</div>{visible.length===0&&<div className="empty-state"><Heart/><h3>No little treasures here just yet.</h3><p>Try another search, or save something you love.</p><button className="small-button" onClick={()=>{setQuery("");setOnlyLiked(false);setCategory("All")}}>Explore everything</button></div>}<button className="text-link" onClick={()=>{setCategory("All");setQuery("");setOnlyLiked(false);setShowAll(true)}}>Find your little happy thing <ArrowRight size={15}/></button></motion.section>
- <motion.section {...reveal} className="story" id="story"><div className="story-photo"><img src="/images/stitch.jpg" alt="The original handmade blue crochet plush held in the maker's hand" loading="lazy"/><span>Every stitch<br/>is a little<br/>piece of<br/>my heart ♡</span></div><div className="story-copy"><span className="eyebrow">A little yarn, a ten-year dream</span><h2>More Than Just<br/>Crochet <span>♡</span></h2><p>I'm a student, a dreamer and a crochet lover. What started with an accidentally ordered crochet hook became a decade of making little things for the people I love.</p><p>Campus-Crochet is that love, stitched into something you can keep. Small batches, real photographs, and a whole lot of heart.</p><a className="stitch-button" href="#why">Our little promise <ArrowRight size={15}/></a></div><div className="story-collage"><div className="polaroid"><img src="/images/pastel-bag-clean.png" alt="Pastel floral crochet shoulder bag" loading="lazy"/><span>made to go wherever you do ♡</span></div><div className="polaroid second"><img src="/images/bunny.jpg" alt="Actual strawberry bunny crochet keepsake" loading="lazy"/><span>little things. big feelings.</span></div><Sprig className="collage-leaf"/></div></motion.section>
- <motion.section {...reveal} className="why section-wrap" id="why"><Title sub="Because you deserve more than just a product — you deserve a feeling.">Why Choose Campus-Crochet?</Title><div className="why-grid">{[{icon:HandHeart,a:"100% Handmade",b:"with love & care"},{icon:Leaf,a:"Chosen with Care",b:"yarn you can feel"},{icon:Scissors,a:"Real Product Photos",b:"the details are the difference"},{icon:Heart,a:"A Personal Touch",b:"from one maker to you"},{icon:Gift,a:"Thoughtful Little Gifts",b:"for your favourite people"}].map(({icon:Icon,a,b})=><div key={a}><Icon/><h3>{a}</h3><p>{b}</p></div>)}</div><Yarn className="why-yarn"/></motion.section>
- <motion.section {...reveal} className="love-notes section-wrap"><Title sub="A few things to know about your new little favourite.">Made With Love. Kept With Care.</Title><div className="note-grid">{[{icon:Heart,title:"A little beautifully imperfect",body:"Every piece is made by hand. Small variations are part of what makes yours yours.",img:"bunny"},{icon:Scissors,title:"A decade in every stitch",body:"Ten years of learning, making and falling in love with crochet, all over again.",img:"coaster"},{icon:Leaf,title:"A gentle kind of love",body:"Hand wash gently and let your crochet air dry. A little care goes a long way.",img:"minion"}].map(({icon:Icon,title,body,img})=><article className="note-card" key={title}><Icon size={23}/><h3>{title}</h3><p>{body}</p><img src={`/images/${img}.jpg`} alt={`${img} crochet detail`} loading="lazy"/></article>)}</div></motion.section>
- <motion.section {...reveal} className="moments section-wrap"><Title sub="Real photos. Real stitches. A little everyday happiness.">Little Moments, Big Joy</Title><div className="moment-grid">{["stitch","bunny","coaster","bag","tulips","minion"].map((id,i)=><button key={id} onClick={()=>setSelected(products.find(p=>p.id===id)!)} aria-label={`Open ${id} photo`}><img src={photo(id)} alt={`Original handmade ${id} photograph`} loading="lazy"/><span><Heart size={18}/></span></button>)}</div><div className="handwritten">Made by hand. Loved for real. ♡</div></motion.section>
- <section className="contact-band" id="contact"><Yarn/><div><h2>Let's make something lovely ♡</h2><p>A tiny gift, a favourite colour, a little idea.<br/>Your next happy thing starts here.</p></div><button className="stitch-button" onClick={()=>{browse();setNotice("Choose a little favourite to start your collection ♡")}}>Find your favourite <ArrowRight size={15}/></button><span className="handwritten">Small stitches,<br/>big dreams!</span></section>
- </main><footer><div className="footer-top"><a className="brand" href="#home"><Yarn/><span>campus-Crochet</span></a><nav aria-label="Footer navigation"><a href="#home">Home</a><a href="#collection">Shop</a><a href="#story">About</a><a href="#contact">Contact</a></nav><span className="footer-love">Made with <Heart size={13}/> by a crochet lover</span></div><div className="footer-bottom"><span>© {new Date().getFullYear()} Campus-Crochet. All little stitches reserved.</span><span>A little handmade happiness.</span></div></footer>
- {notice&&<div className="toast" role="status"><Check size={17}/>{notice}</div>}
- {(cartOpen||selected)&&<div className="modal-backdrop" onClick={()=>{setCartOpen(false);setSelected(null)}}/>}
- {selected&&<div className="product-modal" role="dialog" aria-modal="true" aria-label={selected.name}><button autoFocus className="close-modal icon-button" onClick={()=>setSelected(null)} aria-label="Close product"><X/></button><img src={photo(selected.id)} alt={selected.name}/><div><span className="eyebrow">{selected.category}</span><h2>{selected.name}</h2><p>{selected.note}. Made by hand, with all the character and care that makes crochet special.</p><p className="detail-note">Original product photograph. Hand wash gently. Pricing and availability will be confirmed when the shop launches.</p><button className="stitch-button" onClick={()=>add(selected.id)}>Add to bag <ShoppingBag size={17}/></button></div></div>}
- {cartOpen&&<aside className="cart-drawer" role="dialog" aria-modal="true" aria-label="Your bag"><div className="cart-heading"><h2>Your little bag ♡</h2><button autoFocus className="icon-button" aria-label="Close bag" onClick={()=>setCartOpen(false)}><X/></button></div>{count===0?<div className="empty-state"><ShoppingBag/><h3>A little happiness belongs here.</h3><button className="stitch-button" onClick={()=>{setCartOpen(false);browse()}}>Explore the collection <ArrowRight size={15}/></button></div>:<><div className="cart-items">{products.filter(p=>cart[p.id]>0).map(p=><div className="cart-item" key={p.id}><img src={photo(p.id)} alt={p.name}/><div><h3>{p.name}</h3><p>Handmade with love</p><div className="quantity"><button aria-label={`Remove one ${p.name}`} onClick={()=>setCart(v=>({...v,[p.id]:Math.max(0,v[p.id]-1)}))}><Minus size={13}/></button><span>{cart[p.id]}</span><button aria-label={`Add one ${p.name}`} onClick={()=>setCart(v=>({...v,[p.id]:v[p.id]+1}))}><Plus size={13}/></button></div></div></div>)}</div><div className="cart-summary"><p>Your favourites are saved on this device.</p><strong>The shop is getting its finishing stitches.</strong><p>Pricing, availability and ordering will arrive with the full shop. For now, keep a little wishlist of what you love.</p><button className="stitch-button" onClick={()=>setCartOpen(false)}>Keep exploring <ArrowRight size={15}/></button></div></>}</aside>}
- </div></MotionConfig>
+import { media } from "@/lib/media";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
+import {
+  Heart,
+  ArrowRight,
+  Scissors,
+  HandHeart,
+  Leaf,
+  ShoppingBag,
+  Gift,
+  X,
+  Plus,
+} from "lucide-react";
+import { categories, photo, money } from "@/lib/catalog";
+import { Yarn, Sprig, Title } from "@/components/design";
+import { useShop } from "@/components/site-shell";
+const reveal = {
+  initial: { opacity: 0, y: 22 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.12 },
+  transition: { duration: 0.6 },
+};
+export default function Home() {
+  const router = useRouter();
+  const { liked, toggleLike, add, catalog: products, settings } = useShop();
+  const [query, setQuery] = useState(""),
+    [category, setCategory] = useState("All"),
+    [onlyLiked, setOnlyLiked] = useState(false);
+  const showAll = false;
+  const visible = products.filter(
+    (p) =>
+      (category === "All" || p.category === category) &&
+      (!onlyLiked || liked.includes(p.id)) &&
+      `${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
+  );
+  function browse(name = "All") {
+    router.push(
+      name === "All" ? "/shop" : `/shop?category=${encodeURIComponent(name)}`,
+    );
+  }
+  return (
+    <main id="home">
+      <section className="hero">
+        <div
+          className="hero-photo"
+          style={{ backgroundImage: `url("${settings.heroImage}")` }}
+          role="img"
+          aria-label="Warm crochet craft studio"
+        />
+        <div className="hero-product">
+          <img
+            src={media("/images/stitch.jpg")}
+            alt="The original handmade blue crochet plush"
+          />
+          <span>your new little bestie ♡</span>
+        </div>
+        <img
+          className="hero-blooms"
+          src={media("/images/tulips-clean.png")}
+          alt=""
+          aria-hidden="true"
+        />
+        <div className="hero-paper">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="eyebrow">
+              Handmade with love <span>♡</span>
+            </div>
+            <h1>
+              {settings.heroTitle.split("\n").map((line, i) => (
+                <span className="hero-title-line" key={i}>
+                  {line}
+                </span>
+              ))}{" "}
+              <span>♡</span>
+            </h1>
+            <p>{settings.heroDescription}</p>
+            <button className="stitch-button" onClick={() => browse()}>
+              Shop the collection <ArrowRight size={17} />
+            </button>
+            <div className="hero-footnote">
+              <Scissors size={15} /> Slowly made. Wholeheartedly loved.
+            </div>
+          </motion.div>
+          <span className="doodle hero-heart">♡</span>
+          <Sprig className="sprig" />
+        </div>
+        <div className="hero-note">
+          Real
+          <br />
+          Handmade
+          <br />
+          Real Joy ♡<span>⤹</span>
+        </div>
+      </section>
+      <section className="promise-strip" aria-label="Our promises">
+        {[
+          { icon: HandHeart, title: "100% Handmade", text: "with love & care" },
+          {
+            icon: Leaf,
+            title: "Beautiful Yarn",
+            text: "soft, tactile & full of character",
+          },
+          {
+            icon: ShoppingBag,
+            title: "Campus Beginnings",
+            text: "a little closer to home",
+          },
+          {
+            icon: Heart,
+            title: "Little One-of-a-kinds",
+            text: "just like the people you love",
+          },
+        ].map(({ icon: Icon, title, text }) => (
+          <div key={title}>
+            <Icon />
+            <p>
+              <strong>{title}</strong>
+              <span>{text}</span>
+            </p>
+          </div>
+        ))}
+      </section>
+      <motion.section {...reveal} className="categories section-wrap">
+        <Sprig className="corner-doodle" />
+        <Title sub="Little pieces of happiness, sorted for you.">
+          Explore Our Collection
+        </Title>
+        <div className="category-grid">
+          {categories.map((c, i) => (
+            <button
+              className="category-card"
+              key={c.name}
+              onClick={() => browse(c.name)}
+              style={
+                { "--tilt": `${i % 2 ? 1 : -1}deg` } as React.CSSProperties
+              }
+            >
+              <div className="photo-frame">
+                <img src={photo(c.image)} alt={c.name} loading="lazy" />
+              </div>
+              <h3>{c.name}</h3>
+              <span className="mini-button">
+                View all <ArrowRight size={10} />
+              </span>
+            </button>
+          ))}
+        </div>
+      </motion.section>
+      <motion.section
+        {...reveal}
+        className="featured section-wrap"
+        id="collection"
+      >
+        <Title sub="Handpicked favourites, made to melt hearts.">
+          Featured Collection
+        </Title>
+        <div className="filter-row">
+          <button
+            className={category === "All" && !onlyLiked ? "selected" : ""}
+            onClick={() => {
+              setCategory("All");
+              setOnlyLiked(false);
+              setQuery("");
+            }}
+          >
+            All the little things
+          </button>
+          {category !== "All" && (
+            <button className="selected" onClick={() => setCategory("All")}>
+              {category} <X size={12} />
+            </button>
+          )}
+          {onlyLiked && (
+            <button className="selected" onClick={() => setOnlyLiked(false)}>
+              Your favourites <X size={12} />
+            </button>
+          )}
+          <span>Made slowly. Meant to stay.</span>
+        </div>
+        <div className="product-grid">
+          {visible
+            .slice(
+              0,
+              category === "All" && !query && !onlyLiked && !showAll ? 5 : 8,
+            )
+            .map((p, i) => (
+              <motion.article
+                className="product-card"
+                key={p.id}
+                layout
+                style={
+                  { "--tilt": `${i % 2 ? 1 : -1}deg` } as React.CSSProperties
+                }
+              >
+                <div className="product-image">
+                  <button
+                    className="image-open"
+                    aria-label={`View ${p.name}`}
+                    onClick={() => router.push(`/products/${p.id}`)}
+                  >
+                    <img src={p.gallery[0]} alt={p.name} loading="lazy" />
+                  </button>
+                  <button
+                    className={`favourite ${liked.includes(p.id) ? "is-liked" : ""}`}
+                    aria-label={`${liked.includes(p.id) ? "Unsave" : "Save"} ${p.name}`}
+                    aria-pressed={liked.includes(p.id)}
+                    onClick={() => toggleLike(p.id)}
+                  >
+                    <Heart size={19} />
+                  </button>
+                </div>
+                <button
+                  className="product-name"
+                  onClick={() => router.push(`/products/${p.id}`)}
+                >
+                  {p.name}
+                </button>
+                <p>{p.note}</p>
+                <span className="price-note">{money(p.price)}</span>
+                <button className="small-button" onClick={() => add(p.id)}>
+                  Add to bag <Plus size={12} />
+                </button>
+              </motion.article>
+            ))}
+        </div>
+        {visible.length === 0 && (
+          <div className="empty-state">
+            <Heart />
+            <h3>No little treasures here just yet.</h3>
+            <p>Try another search, or save something you love.</p>
+            <button
+              className="small-button"
+              onClick={() => {
+                setQuery("");
+                setOnlyLiked(false);
+                setCategory("All");
+              }}
+            >
+              Explore everything
+            </button>
+          </div>
+        )}
+        <button className="text-link" onClick={() => router.push("/shop")}>
+          Find your little happy thing <ArrowRight size={15} />
+        </button>
+      </motion.section>
+      <motion.section {...reveal} className="story" id="story">
+        <div className="story-photo">
+          <img
+            src={media("/images/stitch.jpg")}
+            alt="The original handmade blue crochet plush held in the maker's hand"
+            loading="lazy"
+          />
+          <span>
+            Every stitch
+            <br />
+            is a little
+            <br />
+            piece of
+            <br />
+            my heart ♡
+          </span>
+        </div>
+        <div className="story-copy">
+          <span className="eyebrow">A little yarn, a ten-year dream</span>
+          <h2>
+            More Than Just
+            <br />
+            Crochet <span>♡</span>
+          </h2>
+          <p>
+            I'm a student, a dreamer and a crochet lover. What started with an
+            accidentally ordered crochet hook became a decade of making little
+            things for the people I love.
+          </p>
+          <p>
+            Campus-Crochet is that love, stitched into something you can keep.
+            Small batches, real photographs, and a whole lot of heart.
+          </p>
+          <a className="stitch-button" href="/about">
+            Our little promise <ArrowRight size={15} />
+          </a>
+        </div>
+        <div className="story-collage">
+          <div className="polaroid">
+            <img
+              src={media("/images/pastel-bag-clean.png")}
+              alt="Pastel floral crochet shoulder bag"
+              loading="lazy"
+            />
+            <span>made to go wherever you do ♡</span>
+          </div>
+          <div className="polaroid second">
+            <img
+              src={media("/images/bunny.jpg")}
+              alt="Actual strawberry bunny crochet keepsake"
+              loading="lazy"
+            />
+            <span>little things. big feelings.</span>
+          </div>
+          <Sprig className="collage-leaf" />
+        </div>
+      </motion.section>
+      <motion.section {...reveal} className="why section-wrap" id="why">
+        <Title sub="Because you deserve more than just a product — you deserve a feeling.">
+          Why Choose Campus-Crochet?
+        </Title>
+        <div className="why-grid">
+          {[
+            { icon: HandHeart, a: "100% Handmade", b: "with love & care" },
+            { icon: Leaf, a: "Chosen with Care", b: "yarn you can feel" },
+            {
+              icon: Scissors,
+              a: "Real Product Photos",
+              b: "the details are the difference",
+            },
+            { icon: Heart, a: "A Personal Touch", b: "from one maker to you" },
+            {
+              icon: Gift,
+              a: "Thoughtful Little Gifts",
+              b: "for your favourite people",
+            },
+          ].map(({ icon: Icon, a, b }) => (
+            <div key={a}>
+              <Icon />
+              <h3>{a}</h3>
+              <p>{b}</p>
+            </div>
+          ))}
+        </div>
+        <Yarn className="why-yarn" />
+      </motion.section>
+      <motion.section {...reveal} className="love-notes section-wrap">
+        <Title sub="A few things to know about your new little favourite.">
+          Made With Love. Kept With Care.
+        </Title>
+        <div className="note-grid">
+          {[
+            {
+              icon: Heart,
+              title: "A little beautifully imperfect",
+              body: "Every piece is made by hand. Small variations are part of what makes yours yours.",
+              img: "bunny",
+            },
+            {
+              icon: Scissors,
+              title: "A decade in every stitch",
+              body: "Ten years of learning, making and falling in love with crochet, all over again.",
+              img: "coaster",
+            },
+            {
+              icon: Leaf,
+              title: "A gentle kind of love",
+              body: "Hand wash gently and let your crochet air dry. A little care goes a long way.",
+              img: "minion",
+            },
+          ].map(({ icon: Icon, title, body, img }) => (
+            <article className="note-card" key={title}>
+              <Icon size={23} />
+              <h3>{title}</h3>
+              <p>{body}</p>
+              <img
+                src={`/images/${img}.jpg`}
+                alt={`${img} crochet detail`}
+                loading="lazy"
+              />
+            </article>
+          ))}
+        </div>
+      </motion.section>
+      <motion.section {...reveal} className="moments section-wrap">
+        <Title sub="Real photos. Real stitches. A little everyday happiness.">
+          Little Moments, Big Joy
+        </Title>
+        <div className="moment-grid">
+          {["stitch", "bunny", "coaster", "bag", "tulips", "minion"].map(
+            (id, i) => (
+              <button
+                key={id}
+                onClick={() => router.push(`/products/${id}`)}
+                aria-label={`Open ${id} photo`}
+              >
+                <img
+                  src={photo(id)}
+                  alt={`Original handmade ${id} photograph`}
+                  loading="lazy"
+                />
+                <span>
+                  <Heart size={18} />
+                </span>
+              </button>
+            ),
+          )}
+        </div>
+        <div className="handwritten">Made by hand. Loved for real. ♡</div>
+      </motion.section>
+    </main>
+  );
 }
-
-
-
-
-
-
-
-
