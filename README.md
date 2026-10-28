@@ -1,6 +1,6 @@
 # Campus Crochet
 
-Campus Crochet is a Next.js storefront backed by Supabase Auth, Postgres and Storage, Razorpay payments, and Resend order email. The existing catalogue and visual design remain in the project.
+Campus Crochet is a Next.js website with a manually switchable design poll and storefront. It uses Supabase Auth, Postgres and Storage, Razorpay payments in shop mode, and Resend order email. The existing catalogue and visual design remain in the project.
 
 ## Local setup
 
@@ -15,7 +15,9 @@ Run `supabase/migrations/20261027_campus_storefront.sql`, `supabase/migrations/2
 
 The public storefront reads products and content from Supabase. Registered users save their bag and favourites per account. `/account` shows each customer's own orders and tracking stages. `/admin` asks the designated administrator for a separate password after Google sign-in before showing orders, product editing, messages, Journey and site content.
 
-Checkout currently accepts Aditya Surampalem with no added delivery charge. The “Others” address field is available, but payment is held until a destination-specific charge can be displayed before payment. Checkout requires a verified registered email, name, Indian mobile number, and consent. Razorpay payment is confirmed against the provider before the order is marked paid. Resend queues one confirmation for a captured payment and one completion email when the admin first marks the order completed. Intermediate stages appear in the account dashboard without email.
+The live mode starts as a no-payment poll holding page after `supabase/migrations/20261028_poll_mode.sql` is applied. In `/admin` → Polls, the designated admin can create a draft, upload separate design photos and manually open a round. Visitors may choose several designs, sign in with Google to submit one editable ballot per round, and see live totals. `/admin` → Analytics shows approximate browser visitors, visits and focused-tab time. The admin can switch to the selling storefront without redeploying. The complete storefront before poll mode is preserved in local Git commit `c8e3554` on branch `codex/full-storefront-snapshot-2026-10-28`.
+
+In shop mode, Aditya Surampalem delivery is included. “Others” checkout requires a verified destination PIN and packed-weight rate entered in `/admin`; the server adds that delivery charge before payment. Checkout requires a verified registered email, name, Indian mobile number and consent. Razorpay payment is confirmed against the provider before the order is marked paid. Resend queues one confirmation for a captured payment and one completion email when the admin first marks the order completed.
 
 See [production setup](docs/production-setup.md) for the remaining account configuration and launch checks. The running storefront uses Supabase; obsolete Firebase runtime code and setup commands have been removed.
 

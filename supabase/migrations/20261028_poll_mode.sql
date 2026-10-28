@@ -88,12 +88,54 @@ drop trigger if exists poll_orders_shop_only on public.orders;
 create trigger poll_orders_shop_only before insert on public.orders
   for each row execute function public.poll_block_new_orders();
 
+-- Claims and gateway attachments share the same mode lock as transitions. A switch
+-- waits for in-flight preparations to attach or for their two-minute lease to expire.
+create or replace function public.shop_claim_gateway(p_id uuid, p_claim uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare o public.orders%rowtype; current_mode text;
+begin
+  select mode into current_mode from public.site_runtime where id = true for share;
+  if current_mode is distinct from 'shop' then raise exception 'Shopping is unavailable while the design poll is open.'; end if;
+  select * into o from public.orders where order_id = p_id for update;
+  if not found or o.payment_status <> 'pending' or o.order_status <> 'pending' then
+    raise exception 'This checkout can no longer start.';
+  end if;
+  if o.razorpay_order_id is not null then raise exception 'Payment already started.'; end if;
+  if o.gateway_claim is not null and o.gateway_claimed_at > now() - interval '2 minutes' then
+    raise exception 'Payment is being prepared. Please wait a moment.';
+  end if;
+  update public.orders set gateway_claim = p_claim, gateway_claimed_at = now() where order_id = p_id;
+end $$;
+
+create or replace function public.cc_attach_gateway(p_id uuid, p_claim uuid, p_gateway text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare current_mode text;
+begin
+  select mode into current_mode from public.site_runtime where id = true for share;
+  if current_mode is distinct from 'shop' then raise exception 'Shopping is unavailable while the design poll is open.'; end if;
+  update public.orders set razorpay_order_id = p_gateway, gateway_claim = null, gateway_claimed_at = null
+    where order_id = p_id and gateway_claim = p_claim
+      and payment_status = 'pending' and order_status = 'pending';
+  if not found then raise exception 'Payment preparation expired. Contact support.'; end if;
+end $$;
+revoke execute on function public.shop_claim_gateway(uuid,uuid) from public, anon, authenticated;
+revoke execute on function public.cc_attach_gateway(uuid,uuid,text) from public, anon, authenticated;
+grant execute on function public.shop_claim_gateway(uuid,uuid) to service_role;
+grant execute on function public.cc_attach_gateway(uuid,uuid,text) to service_role;
+
 create or replace function public.poll_admin_transition(p_action text, p_round uuid default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare state public.site_runtime%rowtype; chosen public.poll_rounds%rowtype;
 begin
   select * into state from public.site_runtime where id = true for update;
   if not found then raise exception 'Site mode is not configured.'; end if;
+  if p_action in ('open','resume','hold','close') and state.mode = 'shop' and exists (
+    select 1 from public.orders where payment_status = 'pending' and order_status = 'pending'
+      and gateway_claim is not null and gateway_claimed_at > now() - interval '2 minutes'
+      and razorpay_order_id is null
+  ) then
+    raise exception 'A checkout is preparing payment. Try the switch again in a moment.';
+  end if;
   if p_action = 'open' then
     select * into chosen from public.poll_rounds where id = p_round for update;
     if not found or chosen.status <> 'draft' then raise exception 'Choose a draft poll.'; end if;
@@ -178,17 +220,46 @@ alter table public.site_analytics_ticks enable row level security;
 revoke all on public.site_analytics_ticks from public, anon, authenticated;
 grant all on public.site_analytics_ticks to service_role;
 
-create or replace function public.site_record_activity(p_visitor uuid, p_seconds integer)
-returns void language plpgsql security definer set search_path = '' as $$
+create table if not exists public.site_analytics_visits (
+  visitor_id uuid not null,
+  visit_id uuid not null,
+  started_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  primary key(visitor_id, visit_id)
+);
+create index if not exists site_analytics_visits_start on public.site_analytics_visits(started_at);
+create index if not exists site_analytics_visits_seen on public.site_analytics_visits(last_seen_at);
+create table if not exists public.site_analytics_optouts (
+  visitor_hash text primary key,
+  blocked_at timestamptz not null default now()
+);
+alter table public.site_analytics_visits enable row level security;
+alter table public.site_analytics_optouts enable row level security;
+revoke all on public.site_analytics_visits, public.site_analytics_optouts from public, anon, authenticated;
+grant all on public.site_analytics_visits, public.site_analytics_optouts to service_role;
+
+drop function if exists public.site_record_activity(uuid,integer);
+create or replace function public.site_record_activity(p_visitor uuid, p_visit uuid, p_seconds integer)
+returns boolean language plpgsql security definer set search_path = '' as $$
 declare bucket timestamptz;
 begin
-  if p_seconds not between 0 and 30 then raise exception 'Invalid activity interval.'; end if;
+  if p_visitor is null or p_visit is null or p_seconds not between 0 and 30 then
+    raise exception 'Invalid activity interval.';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('analytics/' || p_visitor::text, 0));
+  if exists (select 1 from public.site_analytics_optouts where visitor_hash = md5(p_visitor::text)) then
+    return false;
+  end if;
+  insert into public.site_analytics_visits(visitor_id, visit_id) values(p_visitor, p_visit)
+    on conflict(visitor_id, visit_id) do update set last_seen_at = now();
   bucket := date_trunc('minute', now()) + floor(extract(second from now()) / 30) * interval '30 seconds';
   insert into public.site_analytics_ticks(visitor_id, bucket_at, active_seconds)
     values(p_visitor, bucket, p_seconds)
     on conflict(visitor_id, bucket_at) do update
       set active_seconds = greatest(public.site_analytics_ticks.active_seconds, excluded.active_seconds);
   delete from public.site_analytics_ticks where bucket_at < now() - interval '180 days';
+  delete from public.site_analytics_visits where last_seen_at < now() - interval '180 days';
+  return true;
 end $$;
 
 create or replace function public.site_analytics_summary()
@@ -201,18 +272,26 @@ returns jsonb language sql security definer set search_path = '' as $$
   select jsonb_build_object(
     'todayVisitors', (select count(distinct visitor_id) from recent where local_at::date = (now() at time zone 'Asia/Kolkata')::date),
     'weekVisitors', (select count(distinct visitor_id) from recent where date_trunc('week', local_at) = date_trunc('week', now() at time zone 'Asia/Kolkata')),
+    'todayVisits', (select count(*) from public.site_analytics_visits where (started_at at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date),
+    'weekVisits', (select count(*) from public.site_analytics_visits where date_trunc('week', started_at at time zone 'Asia/Kolkata') = date_trunc('week', now() at time zone 'Asia/Kolkata')),
     'todayActiveMinutes', (select coalesce(round(sum(active_seconds)::numeric / 60, 1), 0) from recent where local_at::date = (now() at time zone 'Asia/Kolkata')::date),
-    'hourly', coalesce((select jsonb_agg(jsonb_build_object('period', hour, 'visitors', visitors, 'activeMinutes', active_minutes) order by hour)
+    'hourly', coalesce((select jsonb_agg(jsonb_build_object('period', hour, 'visitors', visitors, 'visits',
+        (select count(*) from public.site_analytics_visits v where date_trunc('hour', v.started_at at time zone 'Asia/Kolkata') = h.hour),
+        'activeMinutes', active_minutes) order by hour)
       from (select date_trunc('hour', local_at) as hour, count(distinct visitor_id) as visitors,
         round(sum(active_seconds)::numeric / 60, 1) as active_minutes from recent
         where local_at >= (now() at time zone 'Asia/Kolkata') - interval '24 hours'
         group by 1) h), '[]'::jsonb),
-    'daily', coalesce((select jsonb_agg(jsonb_build_object('period', day, 'visitors', visitors, 'activeMinutes', active_minutes) order by day)
+    'daily', coalesce((select jsonb_agg(jsonb_build_object('period', day, 'visitors', visitors, 'visits',
+        (select count(*) from public.site_analytics_visits v where (v.started_at at time zone 'Asia/Kolkata')::date = d.day),
+        'activeMinutes', active_minutes) order by day)
       from (select local_at::date as day, count(distinct visitor_id) as visitors,
         round(sum(active_seconds)::numeric / 60, 1) as active_minutes from recent
         where local_at >= (now() at time zone 'Asia/Kolkata') - interval '30 days'
         group by 1) d), '[]'::jsonb),
-    'weekly', coalesce((select jsonb_agg(jsonb_build_object('period', week, 'visitors', visitors, 'activeMinutes', active_minutes) order by week)
+    'weekly', coalesce((select jsonb_agg(jsonb_build_object('period', week, 'visitors', visitors, 'visits',
+        (select count(*) from public.site_analytics_visits v where date_trunc('week', v.started_at at time zone 'Asia/Kolkata')::date = w.week),
+        'activeMinutes', active_minutes) order by week)
       from (select date_trunc('week', local_at)::date as week, count(distinct visitor_id) as visitors,
         round(sum(active_seconds)::numeric / 60, 1) as active_minutes from recent
         group by 1) w), '[]'::jsonb)
@@ -220,15 +299,22 @@ returns jsonb language sql security definer set search_path = '' as $$
 $$;
 
 create or replace function public.site_delete_visitor_activity(p_visitor uuid)
-returns void language sql security definer set search_path = '' as $$
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if p_visitor is null then raise exception 'Invalid visitor.'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('analytics/' || p_visitor::text, 0));
+  insert into public.site_analytics_optouts(visitor_hash) values(md5(p_visitor::text)) on conflict do nothing;
   delete from public.site_analytics_ticks where visitor_id = p_visitor;
+  delete from public.site_analytics_visits where visitor_id = p_visitor;
+end
 $$;
-revoke execute on function public.site_record_activity(uuid,integer) from public, anon, authenticated;
+revoke execute on function public.site_record_activity(uuid,uuid,integer) from public, anon, authenticated;
 revoke execute on function public.site_analytics_summary() from public, anon, authenticated;
 revoke execute on function public.site_delete_visitor_activity(uuid) from public, anon, authenticated;
-grant execute on function public.site_record_activity(uuid,integer) to service_role;
+grant execute on function public.site_record_activity(uuid,uuid,integer) to service_role;
 grant execute on function public.site_analytics_summary() to service_role;
 grant execute on function public.site_delete_visitor_activity(uuid) to service_role;
 
 -- Retain no more than 180 days of visitor activity.
 delete from public.site_analytics_ticks where bucket_at < now() - interval '180 days';
+delete from public.site_analytics_visits where last_seen_at < now() - interval '180 days';

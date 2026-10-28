@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { clampActiveSeconds, parseVisitorCookie, signVisitorCookie } from "../lib/analytics-domain";
+import { advanceActiveWindow, clampActiveSeconds, parseVisitorCookie, signVisitorCookie } from "../lib/analytics-domain";
 
 test("activity pings cannot claim excessive time", () => {
   assert.equal(clampActiveSeconds(18), 18);
@@ -16,4 +16,12 @@ test("visitor cookies require a valid signature", () => {
   assert.equal(parseVisitorCookie(cookie, key), id);
   assert.equal(parseVisitorCookie(cookie.replace("140f", "140e"), key), null);
   assert.equal(parseVisitorCookie(cookie, "wrong-secret"), null);
+});
+
+test("active time only accrues while visible and focused", () => {
+  let window = { at: 0, active: true, milliseconds: 0 };
+  window = advanceActiveWindow(window, 29000, false);
+  window = advanceActiveWindow(window, 30000, true);
+  window = advanceActiveWindow(window, 31000, true);
+  assert.equal(window.milliseconds, 30000);
 });

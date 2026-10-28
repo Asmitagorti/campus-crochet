@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { stopAnalyticsAndDrain } from "./analytics-session";
 
 export default function AnalyticsOptOut() {
   const [done, setDone] = useState(false);
@@ -9,6 +10,7 @@ export default function AnalyticsOptOut() {
     <button className="outline-button" type="button" disabled={done || busy} onClick={async () => {
       setBusy(true); setError("");
       try {
+        await stopAnalyticsAndDrain();
         const response = await fetch("/api/analytics", { method: "DELETE" });
         if (!response.ok) throw Error("Could not update this preference. Please try again.");
         window.dispatchEvent(new Event("campus-analytics-optout"));

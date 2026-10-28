@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { adminDatabase } from "@/lib/supabase-admin";
-import { clampActiveSeconds, parseVisitorCookie, signVisitorCookie } from "@/lib/analytics-domain";
-import { guard, errorResponse } from "@/lib/forms";
+import { clampActiveSeconds, isUuid, parseVisitorCookie, signVisitorCookie } from "@/lib/analytics-domain";
+import { guard, sameOrigin, errorResponse } from "@/lib/forms";
 
 export const runtime = "nodejs";
 const idCookie = "cc_visitor";
@@ -17,23 +17,27 @@ function secret() {
 
 export async function POST(request: Request) {
   try {
-    await guard(request, 100);
+    // Campus visitors may share one public IP; visible tabs send about 30 pings in 15 minutes.
+    await guard(request, 3000);
     const jar = await cookies();
     if (jar.get(optOutCookie)?.value === "1") return Response.json({ recorded: false });
     const body = await request.json();
     const seconds = clampActiveSeconds(body.activeSeconds);
+    if (!isUuid(body.visitId)) throw Error("Invalid visit ID.");
     const existing = parseVisitorCookie(jar.get(idCookie)?.value, secret());
     const visitor = existing || randomUUID();
-    const { error } = await adminDatabase().rpc("site_record_activity", { p_visitor: visitor, p_seconds: seconds });
+    const { data: recorded, error } = await adminDatabase().rpc("site_record_activity", {
+      p_visitor: visitor, p_visit: body.visitId, p_seconds: seconds,
+    });
     if (error) throw error;
-    if (!existing) jar.set(idCookie, signVisitorCookie(visitor, secret()), cookieOptions);
-    return Response.json({ recorded: true }, { headers: { "Cache-Control": "no-store" } });
+    if (recorded && !existing) jar.set(idCookie, signVisitorCookie(visitor, secret()), cookieOptions);
+    return Response.json({ recorded: recorded === true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return errorResponse(error); }
 }
 
 export async function DELETE(request: Request) {
   try {
-    await guard(request, 20);
+    if (!sameOrigin(request)) throw Error("Please submit this request from the website.");
     const jar = await cookies();
     const visitor = parseVisitorCookie(jar.get(idCookie)?.value, secret());
     if (visitor) {

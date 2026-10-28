@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       if (row.fingerprint !== fingerprint) throw Error("Your bag or details changed. Start a new checkout.");
       if (row.status === "paid") return Response.json({ paid: true, id: row.id, token: row.token });
       if (row.status !== "pending") throw Error("This attempt ended. Start a fresh checkout.");
-      if (row.provider_id) return Response.json(checkoutData(row));
+      if (row.provider_id) { await requireShoppingMode(); return Response.json(checkoutData(row)); }
     } else {
       const id = await createReservedOrder({ userId: user.uid, key, fingerprint, customer,
         items: items.map(({ productId, quantity, color }) => ({ productId, quantity, color })), amount });
@@ -44,12 +44,14 @@ export async function POST(request: Request) {
     }
     const claim = randomUUID();
     await claimGateway(row.id, claim);
+    await requireShoppingMode();
     const provider = await gateway<{ id: string; amount: number; currency: string }>("orders", {
       method: "POST",
       body: JSON.stringify({ amount: row.amount, currency: "INR", receipt: row.id, notes: { campus_order: row.receipt } }),
     });
     if (provider.amount !== row.amount || provider.currency !== "INR") throw Error("Payment amount mismatch.");
     await attachProvider(row.id, claim, provider.id);
+    await requireShoppingMode();
     row = await orderById(row.id);
     if (!row) throw Error("Order could not be loaded. Please contact support.");
     return Response.json(checkoutData(row), { status: 201 });
