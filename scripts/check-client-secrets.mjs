@@ -9,13 +9,12 @@ async function files(dir) {
   }
   return result;
 }
-const privateKey = process.env.FIREBASE_ADMIN_JSON
-  ? JSON.parse(process.env.FIREBASE_ADMIN_JSON).private_key
-  : undefined;
 const secrets = [
   process.env.RAZORPAY_KEY_SECRET,
   process.env.CLOUDINARY_API_SECRET,
-  privateKey,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  process.env.RESEND_API_KEY,
+  process.env.CRON_SECRET,
 ].filter(Boolean);
 let found = 0;
 for (const file of await files(".next/static")) {
@@ -28,5 +27,5 @@ for (const file of await files(".next/static")) {
 if (found) process.exitCode = 1;
 else
   console.log(
-    "PASS: no configured server secret or service-account private key found in browser assets.",
+    "PASS: no configured server secret found in browser assets.",
   );

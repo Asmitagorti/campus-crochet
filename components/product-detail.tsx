@@ -185,15 +185,14 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               <HandHeart size={18} /> Made by hand
             </span>
             <span>
-              <MapPin size={18} /> Campus pickup
+              <MapPin size={18} /> Aditya Surampalem delivery
             </span>
             <span>
               <Check size={18} /> Secure Razorpay checkout
             </span>
           </div>
           <p className="quiet-note">
-            Campus pickup only for now. We will coordinate the handover with
-            you. No delivery charge.
+            Delivery in Aditya Surampalem is included. For supported PIN codes elsewhere, checkout shows the full delivery charge before payment.
           </p>
         </section>
       </div>
@@ -260,7 +259,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                   "Contact us for exact measurements before purchasing",
                 ],
                 ["Availability", availability({ ...p, stock })],
-                ["Collection", "Campus pickup, arranged after your order"],
+                ["Delivery", "Aditya Surampalem included; supported PIN codes quoted at checkout"],
               ].map(([key, value]) => (
                 <div key={key}>
                   <dt>{key}</dt>

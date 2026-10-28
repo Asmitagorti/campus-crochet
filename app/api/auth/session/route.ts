@@ -1,52 +1,25 @@
-import { adminAuth, firestore, requireUser } from "@/lib/firebase-admin";
+import { adminDatabase, requireUser } from "@/lib/supabase-admin";
 import { errorResponse } from "@/lib/forms";
+import { adminRoleForEmail } from "@/lib/admin-identity";
+
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
-    const token = await requireUser(request),
-      f = firestore(),
-      config = f.doc("admin_config/singleton"),
-      profile = f.doc(`users/${token.uid}`);
-    const authorisedEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-    const admin = await f.runTransaction(async (tx) => {
-      const [record, user] = await tx.getAll(config, profile);
-      let isAdmin = record.data()?.uid === token.uid;
-      if (!record.exists && token.email?.toLowerCase() === authorisedEmail) {
-        tx.create(config, {
-          uid: token.uid,
-          email: token.email,
-          createdAt: new Date().toISOString(),
-        });
-        isAdmin = true;
-      }
-      if (
-        record.exists &&
-        record.data()?.uid === null &&
-        record.data()?.email === token.email?.toLowerCase()
-      ) {
-        tx.update(config, { uid: token.uid, boundAt: new Date().toISOString() });
-        isAdmin = true;
-      }
-      if (!user.exists)
-        tx.create(profile, {
-          uid: token.uid,
-          email: token.email,
-          name: token.name || "",
-          role: isAdmin ? "admin" : "customer",
-          createdAt: new Date().toISOString(),
-        });
-      else if (user.data()?.role !== (isAdmin ? "admin" : "customer"))
-        tx.update(profile, { role: isAdmin ? "admin" : "customer" });
-      return isAdmin;
-    });
-    const current = await adminAuth().getUser(token.uid),
-      role = admin ? "admin" : "customer";
-    if (current.customClaims?.role !== role)
-      await adminAuth().setCustomUserClaims(token.uid, {
-        ...current.customClaims,
-        role,
-      });
-    return Response.json({ admin, role });
+    const user = await requireUser(request);
+    const db = adminDatabase();
+    const role = adminRoleForEmail(user.email);
+    const { data: profile, error: readError } = await db.from("users").select("user_id,role").eq("user_id", user.uid).maybeSingle();
+    if (readError) throw readError;
+    if (!profile) {
+      const { error } = await db.from("users").insert({ user_id: user.uid, email: user.email, full_name: user.name, role });
+      if (error && error.code !== "23505") throw error;
+    } else {
+      const updates: Record<string, unknown> = { email: user.email, full_name: user.name };
+      if (profile.role !== role) updates.role = role;
+      const { error } = await db.from("users").update(updates).eq("user_id", user.uid);
+      if (error) throw error;
+    }
+    return Response.json({ admin: role === "admin" });
   } catch (e) {
     return errorResponse(e, 401);
   }

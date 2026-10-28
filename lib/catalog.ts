@@ -1,5 +1,6 @@
 import { media } from "./media";
 export type Product = {
+  databaseId?: string;
   active?: boolean;
   revision?: number;
   id: string;
@@ -11,6 +12,7 @@ export type Product = {
   details: [string, string][];
   colors: string[];
   stock: number | null;
+  packedWeightGrams?: number | null;
   madeToOrder: boolean;
   gallery: string[];
 };
@@ -24,7 +26,7 @@ export const money = (value: number) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(value);
 // Launch prices proposed for review. Stock count confirmed by the owner.
 const base = { stock: 25, madeToOrder: false };
@@ -145,7 +147,7 @@ export const products: Product[] = [
     note: "Thoughtfulness, stitched in",
     price: 299,
     description:
-      "Some occasions deserve a little more than a message on a screen. A handcrafted card finished with crochet flowers makes a keepsake out of your congratulations. Tell us the occasion and message in your order note; we will confirm the details with you.",
+      "Some occasions deserve a little more than a message on a screen. A handcrafted card finished with crochet flowers makes a keepsake out of your congratulations. Contact support about the occasion and message before ordering; we will confirm the details with you.",
     details: [
       ["Palette", "Warm pinks, cream & leafy green"],
       ["Includes", "One handmade card with crochet floral details"],

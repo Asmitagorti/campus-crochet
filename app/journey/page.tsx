@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BookOpen } from "lucide-react";
-import { loadJournal } from "@/lib/content";
+import { loadJournal } from "@/lib/store-data";
 import { Sprig } from "@/components/design";
 export const metadata: Metadata = {
   title: "Journey | Campus-Crochet",

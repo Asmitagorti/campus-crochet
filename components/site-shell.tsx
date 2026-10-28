@@ -16,7 +16,7 @@ import {
   Minus,
   Plus,
   Check,
-  Phone,
+  Mail,
   UserRound,
 } from "lucide-react";
 import { products, getProduct, photo, money, maxQuantity } from "@/lib/catalog";
@@ -28,6 +28,7 @@ type ShopState = {
   add: (id: string, quantity?: number) => void;
   setQuantity: (id: string, n: number) => void;
   clearCart: () => void;
+  refreshPreferences: () => Promise<void>;
   toggleLike: (id: string) => void;
   notify: (s: string) => void;
   openBag: () => void;
@@ -58,8 +59,9 @@ export default function SiteShell({
   initialProducts: typeof products;
   initialSettings: SiteSettings;
 }) {
-  const { user, token } = useAuth();
+  const { user, ready: authReady, logout, token } = useAuth();
   const [preferencesReady, setPreferencesReady] = useState(false);
+  const [preferencesOwner, setPreferencesOwner] = useState<string | null>(null);
   const [settings, setSettings] = useState(initialSettings);
   const [catalog, setCatalog] = useState(initialProducts);
   const pathname = usePathname(),
@@ -73,9 +75,33 @@ export default function SiteShell({
     [bag, setBag] = useState(false),
     [notice, setNotice] = useState("");
   const drawer = useRef<HTMLElement>(null);
+  const activeUserUid = useRef<string | null>(null);
+  activeUserUid.current = user?.uid || null;
+  const owned = !!user && preferencesOwner === user.uid;
+  const visibleCart = owned ? cart : {};
+  const visibleLiked = owned ? liked : [];
+  async function refreshPreferences() {
+    if (!user) return;
+    const uid = user.uid;
+    const response = await fetch("/api/account/preferences", {
+      headers: { Authorization: `Bearer ${await token()}` }, cache: "no-store",
+    });
+    if (!response.ok) throw Error("Your saved bag could not be refreshed.");
+    const data = await response.json();
+    if (activeUserUid.current !== uid) return;
+    setLiked(Array.isArray(data.liked) ? data.liked : []);
+    setCart(data.cart && typeof data.cart === "object" ? data.cart : {});
+    setPreferencesOwner(uid);
+  }
   useEffect(() => {
     setPreferencesReady(false);
-    if (!user) return;
+    setPreferencesOwner(null);
+    setCart({});
+    setLiked([]);
+    setReady(false);
+    setBag(false);
+    if (!authReady) return;
+    if (!user) { setReady(true); return; }
     let active = true;
     token()
       .then((t) =>
@@ -86,65 +112,51 @@ export default function SiteShell({
       .then(async (r) => {
         if (!r.ok) throw Error();
         const d = await r.json();
-        if (active) {
-          setLiked(d.liked);
+        if (active && activeUserUid.current === user.uid) {
+          setLiked(Array.isArray(d.liked) ? d.liked : []);
+          setCart(d.cart && typeof d.cart === "object" ? d.cart : {});
+          setPreferencesOwner(user.uid);
           setPreferencesReady(true);
+          setReady(true);
         }
       })
-      .catch(() => {});
+      .catch(() => { if (active) setNotice("Your saved bag and favourites could not be loaded. Please refresh before shopping."); });
     return () => {
       active = false;
     };
-  }, [user, token]);
+  }, [user?.uid, authReady, token]);
   useEffect(() => {
-    if (!user || !preferencesReady) return;
+    if (!user || !preferencesReady || preferencesOwner !== user.uid) return;
+    const uid = user.uid;
     const timer = setTimeout(() => {
+      if (activeUserUid.current !== uid) return;
       token()
-        .then((t) =>
-          fetch("/api/account/preferences", {
+        .then((t) => {
+          if (activeUserUid.current !== uid) return;
+          return fetch("/api/account/preferences", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${t}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ liked }),
-          }),
-        )
+            body: JSON.stringify({ liked, cart }),
+          });
+        })
         .catch(() => {});
     }, 800);
     return () => clearTimeout(timer);
-  }, [liked, user, preferencesReady, token]);
+  }, [liked, cart, user?.uid, preferencesReady, preferencesOwner, token]);
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem("campus-bag") || "{}");
-      const valid: Record<string, number> = {};
-      for (const p of initialProducts) {
-        const n = saved[p.id];
-        if (Number.isInteger(n) && n > 0)
-          valid[p.id] = Math.min(n, maxQuantity(p));
-      }
-      setCart(valid);
-      const hearts = JSON.parse(localStorage.getItem("campus-hearts") || "[]");
-      if (Array.isArray(hearts))
-        setLiked(
-          hearts.filter(
-            (id) =>
-              typeof id === "string" &&
-              initialProducts.some((p) => p.id === id),
-          ),
-        );
+      localStorage.removeItem("campus-bag");
+      localStorage.removeItem("campus-hearts");
       setDark(localStorage.getItem("campus-theme") === "dark");
     } catch {}
-    setReady(true);
   }, []);
   useEffect(() => {
-    if (ready) {
-      localStorage.setItem("campus-bag", JSON.stringify(cart));
-      localStorage.setItem("campus-hearts", JSON.stringify(liked));
-      document.documentElement.dataset.theme = dark ? "dark" : "light";
-      localStorage.setItem("campus-theme", dark ? "dark" : "light");
-    }
-  }, [cart, liked, dark, ready]);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    localStorage.setItem("campus-theme", dark ? "dark" : "light");
+  }, [dark]);
   useEffect(() => {
     setMenu(false);
     setBag(false);
@@ -219,6 +231,8 @@ export default function SiteShell({
     };
   }, [bag]);
   function setQuantity(id: string, n: number) {
+    if (!user) { router.push("/account"); return; }
+    if (!ready || !owned) { setNotice("Your saved bag is still loading. Please try again shortly."); return; }
     const p = catalog.find((p) => p.id === id);
     if (!p) return;
     const max = Math.min(maxQuantity(p), stocks[id] ?? p.stock ?? 0);
@@ -230,6 +244,8 @@ export default function SiteShell({
     });
   }
   function add(id: string, n = 1) {
+    if (!user) { router.push("/account"); return; }
+    if (!ready || !owned) { setNotice("Your saved bag is still loading. Please try again shortly."); return; }
     const p = catalog.find((p) => p.id === id);
     if (!p) return;
     const max = Math.min(maxQuantity(p), stocks[id] ?? p.stock ?? 0);
@@ -240,23 +256,25 @@ export default function SiteShell({
     setCart((c) => ({ ...c, [id]: Math.min(max, (c[id] || 0) + n) }));
     setNotice("A little happiness added to your bag ♡");
   }
-  const count = catalog.reduce((sum, p) => sum + (cart[p.id] || 0), 0),
-    total = catalog.reduce((sum, p) => sum + (cart[p.id] || 0) * p.price, 0);
+  const count = catalog.reduce((sum, p) => sum + (visibleCart[p.id] || 0), 0),
+    total = catalog.reduce((sum, p) => sum + (visibleCart[p.id] || 0) * p.price, 0);
   return (
     <ShopContext.Provider
       value={{
-        cart,
-        liked,
+        cart: visibleCart,
+        liked: visibleLiked,
         add,
         setQuantity,
         clearCart: () => setCart({}),
-        toggleLike: (id) =>
-          setLiked((v) =>
-            v.includes(id) ? v.filter((x) => x !== id) : [...v, id],
-          ),
+        refreshPreferences,
+        toggleLike: (id) => {
+          if (!user) { router.push("/account"); return; }
+          if (!ready || !owned) { setNotice("Your favourites are still loading. Please try again shortly."); return; }
+          setLiked((v) => v.includes(id) ? v.filter((x) => x !== id) : [...v, id]);
+        },
         notify: setNotice,
         openBag: () => setBag(true),
-        ready,
+        ready: ready && (!user || owned),
         stocks,
         catalog,
         settings,
@@ -295,6 +313,18 @@ export default function SiteShell({
                   {name}
                 </Link>
               ))}
+              {user && (
+                <button
+                  className="nav-signout"
+                  type="button"
+                  onClick={() => {
+                    setMenu(false);
+                    void logout();
+                  }}
+                >
+                  Sign out
+                </button>
+              )}
             </nav>
             <div className="header-actions">
               <form className="search" action="/shop">
@@ -370,31 +400,30 @@ export default function SiteShell({
               big dreams!
             </span>
           </section>
-          <footer>
-            <div className="footer-top">
-              <Link className="brand" href="/">
+          <footer className="site-footer">
+            <div className="footer-grid">
+              <div className="footer-about">
                 <Yarn />
-                <span>{settings.brand}</span>
-              </Link>
-              <nav aria-label="Footer navigation">
-                {links.map(([n, h]) => (
-                  <Link key={h} href={h}>
-                    {n}
-                  </Link>
-                ))}
+                <h2>About Campus Crochet</h2>
+                <p>Handmade crochet pieces shaped with care by a student maker. Little keepsakes, thoughtful gifts and everyday favourites, one stitch at a time.</p>
+              </div>
+              <div>
+                <h2>Customer support</h2>
+                <p>Questions about an order, payment or this website? We are here to help.</p>
+                <a href="mailto:support@campus-crochet.tech"><Mail size={15} /> support@campus-crochet.tech</a>
+                <Link href="/contact">Contact the studio</Link>
+              </div>
+              <nav aria-label="Policies and guides">
+                <h2>Useful links</h2>
+                <Link href="/privacy">Privacy policy</Link>
+                <Link href="/policies#orders">Orders & fulfillment</Link>
+                <Link href="/policies#payments">Payment</Link>
+                <Link href="/policies#cancellations">Cancellation</Link>
+                <Link href="/policies#returns">Returns & exchanges</Link>
+                <Link href="/care">Crochet care guide</Link>
               </nav>
-              <a className="footer-love" href={`tel:+91${settings.phone}`}>
-                <Phone size={13} /> +91 {settings.phone}
-              </a>
             </div>
-            <div className="footer-bottom">
-              <span>
-                © {new Date().getFullYear()} Campus-Crochet. All little stitches
-                reserved.
-              </span>
-              <Link href="/privacy">Privacy & care for your details</Link>
-              <span>Made with love, one stitch at a time.</span>
-            </div>
+            <div className="footer-bottom"><span>© {new Date().getFullYear()} Campus Crochet</span><span>Made with care, one stitch at a time.</span></div>
           </footer>
           {notice && (
             <div className="toast" role="status">
@@ -438,7 +467,7 @@ export default function SiteShell({
                   <>
                     <div className="cart-items">
                       {catalog
-                        .filter((p) => cart[p.id] > 0)
+                        .filter((p) => visibleCart[p.id] > 0)
                         .map((p) => (
                           <div className="cart-item" key={p.id}>
                             <Link
@@ -459,20 +488,20 @@ export default function SiteShell({
                                 <button
                                   aria-label={`Remove one ${p.name}`}
                                   onClick={() =>
-                                    setQuantity(p.id, cart[p.id] - 1)
+                                    setQuantity(p.id, visibleCart[p.id] - 1)
                                   }
                                 >
                                   <Minus size={13} />
                                 </button>
-                                <span>{cart[p.id]}</span>
+                                <span>{visibleCart[p.id]}</span>
                                 <button
                                   disabled={
-                                    cart[p.id] >=
+                                    visibleCart[p.id] >=
                                     Math.min(maxQuantity(p), stocks[p.id] ?? 25)
                                   }
                                   aria-label={`Add one ${p.name}`}
                                   onClick={() =>
-                                    setQuantity(p.id, cart[p.id] + 1)
+                                    setQuantity(p.id, visibleCart[p.id] + 1)
                                   }
                                 >
                                   <Plus size={13} />
@@ -493,7 +522,7 @@ export default function SiteShell({
                         <strong>Subtotal</strong>
                         <strong>{money(total)}</strong>
                       </div>
-                      <p>Campus pickup · No delivery fee</p>
+                      <p>Aditya Surampalem delivery included. For supported PIN codes elsewhere, checkout shows delivery before payment.</p>
                       <Link
                         className="stitch-button full-button"
                         href="/checkout"

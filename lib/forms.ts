@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { allowRequest } from "./database";
+import { allowRequest } from "./order-store";
 export function sameOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return true;

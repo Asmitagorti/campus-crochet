@@ -1,110 +1,64 @@
-import { requireAdmin, firestore } from "@/lib/firebase-admin";
+import { adminDatabase } from "@/lib/supabase-admin";
+import { requireAdminAccess } from "@/lib/admin-access";
+import { dispatchOrderEmails } from "@/lib/order-email-jobs";
 import { guard, text, errorResponse } from "@/lib/forms";
 import { validImage } from "@/lib/image-url";
 import { defaultSettings } from "@/lib/site-settings";
+import { readJsonBody } from "@/lib/request-body";
+
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin(request);
+    const admin = await requireAdminAccess(request);
     await guard(request, 60);
-    const b = await request.json(),
-      f = firestore();
-    let ref: FirebaseFirestore.DocumentReference, data: Record<string, unknown>;
-    if (b.type === "settings") {
-      data = {};
+    const body = await readJsonBody(request);
+    const db = adminDatabase();
+    if (body.type === "order") {
+      if (!/^[0-9a-f-]{36}$/i.test(body.id) || !Number.isInteger(body.version)) throw Error("Refresh the order before saving.");
+      const { error } = await db.rpc("shop_update_fulfillment", {
+        p_id: body.id, p_version: body.version, p_status: body.fulfillment, p_actor: admin.uid,
+      });
+      if (error) throw error;
+      if (body.fulfillment === "completed") {
+        try { await dispatchOrderEmails(5); } catch (error) { console.error("Completion email queue unavailable", error); }
+      }
+      return Response.json({ saved: true });
+    }
+    if (body.type === "message") {
+      const { error } = await db.from("support_tickets").update({ status: "read" }).eq("id", text(body.id, 40));
+      if (error) throw error;
+      return Response.json({ saved: true });
+    }
+    if (!Number.isInteger(body.revision) || body.revision < 0) throw Error("Refresh before saving.");
+    if (body.type === "settings") {
+      const data: Record<string, string> = {};
       for (const key of Object.keys(defaultSettings))
-        data[key] = text(
-          b[key],
-          key === "aboutIntro" || key === "contactIntro" ? 5000 : 1500,
-        );
-      if (!/^\d{10}$/.test(String(data.phone)))
-        throw Error("Use a 10-digit Indian phone number.");
-      if (!validImage(data.heroImage))
-        throw Error("Choose a Cloudinary hero image.");
-      ref = f.doc("site_content/settings");
-    } else if (b.type === "journey") {
-      const slug = text(b.slug, 80);
-      if (
-        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ||
-        text(b.title, 150).length < 3 ||
-        !validImage(b.image)
-      )
+        data[key] = text(body[key], key === "aboutIntro" || key === "contactIntro" ? 5000 : 1500);
+      if (!validImage(data.heroImage)) throw Error("Choose a Supabase hero image.");
+      const { data: result, error } = await db.rpc("shop_save_content", {
+        p_key: "settings", p_expected: body.revision, p_data: data, p_published: true,
+      });
+      if (error) throw error;
+      return Response.json({ saved: true, revision: result });
+    }
+    if (body.type === "journey") {
+      const slug = text(body.slug, 80);
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || text(body.title, 150).length < 3 || !validImage(body.image))
         throw Error("Please check the chapter title, slug and image.");
-      if (
-        !Array.isArray(b.sections) ||
-        b.sections.length < 1 ||
-        b.sections.length > 20 ||
-        !b.sections.every(
-          (s: { heading: unknown; paragraphs: unknown }) =>
-            typeof s.heading === "string" &&
-            s.heading.length < 200 &&
-            Array.isArray(s.paragraphs) &&
-            s.paragraphs.length <= 20 &&
-            s.paragraphs.every(
-              (p) => typeof p === "string" && p.length <= 5000,
-            ),
-        )
-      )
-        throw Error("Please check your chapter sections.");
-      data = {
-        slug,
-        title: text(b.title, 150),
-        category: text(b.category, 80),
-        excerpt: text(b.excerpt, 500),
-        readTime: text(b.readTime, 50),
-        image: b.image,
-        published: b.published === true,
-        sections: b.sections,
-      };
-      ref = f.doc(`journey/${slug}`);
-    } else if (b.type === "order") {
-      if (
-        !["preparing", "ready_for_pickup", "collected"].includes(b.fulfillment)
-      )
-        throw Error("Invalid order stage.");
-      const orderRef = f.doc(`orders/${text(b.id, 40)}`);
-      await f.runTransaction(async (tx) => {
-        const row = await tx.get(orderRef);
-        if (row.data()?.status !== "paid")
-          throw Error("Only paid orders can be prepared.");
-        tx.update(orderRef, {
-          fulfillment: b.fulfillment,
-          updatedAt: new Date().toISOString(),
-        });
-        tx.create(f.collection("audit_log").doc(), {
-          actor: admin.uid,
-          action: "order.fulfillment",
-          target: orderRef.id,
-          stage: b.fulfillment,
-          at: new Date().toISOString(),
-        });
+      if (!Array.isArray(body.sections) || body.sections.length < 1 || body.sections.length > 20 ||
+        !body.sections.every((s: { heading: unknown; paragraphs: unknown }) =>
+          typeof s.heading === "string" && s.heading.length < 200 && Array.isArray(s.paragraphs) &&
+          s.paragraphs.length <= 20 && s.paragraphs.every((p) => typeof p === "string" && p.length <= 5000)))
+        throw Error("Please check the chapter sections.");
+      const data = { slug, title: text(body.title, 150), category: text(body.category, 80),
+        excerpt: text(body.excerpt, 500), readTime: text(body.readTime, 50), image: body.image,
+        sections: body.sections };
+      const { data: result, error } = await db.rpc("shop_save_content", {
+        p_key: `journey/${slug}`, p_expected: body.revision, p_data: data, p_published: body.published === true,
       });
-      return Response.json({ saved: true });
-    } else if (b.type === "message") {
-      await f.doc(`messages/${text(b.id, 40)}`).update({ status: "read" });
-      return Response.json({ saved: true });
-    } else throw Error("Unknown content type.");
-    await f.runTransaction(async (tx) => {
-      const doc = await tx.get(ref);
-      if ((doc.data()?.revision || 0) !== (b.revision || 0))
-        throw Error(
-          "This content changed in another session. Refresh before saving.",
-        );
-      tx.set(ref, {
-        ...data,
-        revision: (doc.data()?.revision || 0) + 1,
-        updatedAt: new Date().toISOString(),
-        updatedBy: admin.uid,
-      });
-      tx.create(f.collection("audit_log").doc(), {
-        actor: admin.uid,
-        action: `${b.type}.update`,
-        target: ref.id,
-        at: new Date().toISOString(),
-      });
-    });
-    return Response.json({ saved: true });
-  } catch (e) {
-    return errorResponse(e);
-  }
+      if (error) throw error;
+      return Response.json({ saved: true, revision: result });
+    }
+    throw Error("Unknown content type.");
+  } catch (error) { return errorResponse(error); }
 }

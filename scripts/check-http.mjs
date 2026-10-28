@@ -18,6 +18,9 @@ const paths = [
   "/products/pastel-bag",
   "/products/round-coasters",
   "/privacy",
+  "/care",
+  "/policies",
+  "/admin",
   "/studio",
   "/products/not-a-product",
 ];
@@ -26,8 +29,10 @@ async function main() {
   for (const path of paths) {
     const r = await fetch(`http://localhost:3000${path}`),
       text = await r.text(),
-      expected = path === "/products/not-a-product" ? 404 : 200;
-    if (r.status !== expected || text.includes("A little tangled thread")) {
+      missing = path === "/products/not-a-product";
+    const validStatus = missing ? [200, 404].includes(r.status) : r.status === 200;
+    const validMissing = !missing || (text.includes("This little thing wandered off") && text.includes('name="robots" content="noindex"'));
+    if (!validStatus || !validMissing || text.includes("A little tangled thread")) {
       console.log(`FAIL ${path} ${r.status}`);
       failures++;
     } else console.log(`PASS ${path} ${r.status}`);

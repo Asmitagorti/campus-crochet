@@ -1,4 +1,4 @@
-import { loadSettings } from "@/lib/content";
+import { loadSettings } from "@/lib/store-data";
 import { media } from "@/lib/media";
 import type { Metadata } from "next";
 import Link from "next/link";

@@ -1,5 +1,4 @@
-import { loadProducts } from "@/lib/database";
-import { loadSettings } from "@/lib/content";
+import { loadProducts, loadSettings } from "@/lib/store-data";
 import AuthProvider from "@/components/auth-provider";
 import SiteShell from "@/components/site-shell";
 import type { Metadata } from "next";

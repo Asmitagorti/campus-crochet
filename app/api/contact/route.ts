@@ -1,10 +1,12 @@
-import { saveMessage } from "@/lib/database";
+import { randomUUID } from "node:crypto";
+import { adminDatabase } from "@/lib/supabase-admin";
 import { guard, text, email, errorResponse } from "@/lib/forms";
+import { readJsonBody } from "@/lib/request-body";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     await guard(request);
-    const b = await request.json();
+    const b = await readJsonBody(request);
     if (b.website) throw Error("Unable to send this message.");
     const name = text(b.name, 80),
       address = email(b.email),
@@ -25,7 +27,15 @@ export async function POST(request: Request) {
       throw Error("Please choose a topic.");
     if (b.consent !== true)
       throw Error("Please agree to the privacy information.");
-    const id = await saveMessage({ name, email: address, topic, message });
+    const { data, error } = await adminDatabase().from("support_tickets").insert({
+      name,
+      email: address,
+      subject: topic,
+      message,
+      submission_key: randomUUID(),
+    }).select("id").single();
+    if (error) throw error;
+    const id = data.id;
     return Response.json({ id }, { status: 201 });
   } catch (e) {
     return errorResponse(e);

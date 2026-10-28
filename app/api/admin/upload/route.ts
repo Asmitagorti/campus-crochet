@@ -1,14 +1,21 @@
-import { createHash, randomUUID } from "node:crypto";
-import { requireAdmin } from "@/lib/firebase-admin";
+import { randomUUID } from "node:crypto";
+import { adminDatabase } from "@/lib/supabase-admin";
+import { requireAdminAccess } from "@/lib/admin-access";
 import { sameOrigin, errorResponse } from "@/lib/forms";
+import { readLimitedBody } from "@/lib/request-body";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
-    await requireAdmin(request);
+    await requireAdminAccess(request);
     if (Number(request.headers.get("content-length") || 0) > 4300000)
       throw Error("Please use a photo smaller than 4 MB.");
     if (!sameOrigin(request)) throw Error("Invalid upload origin.");
-    const form = await request.formData(),
+    const payload = await readLimitedBody(request, 4300000, "Please use a photo smaller than 4 MB.");
+    const form = await new Request(request.url, {
+      method: "POST",
+      headers: { "content-type": request.headers.get("content-type") || "" },
+      body: payload.buffer,
+    }).formData(),
       file = form.get("file");
     if (
       !(file instanceof File) ||
@@ -21,45 +28,20 @@ export async function POST(request: Request) {
       throw Error("Upload a JPG, PNG, WebP or AVIF photo under 4 MB.");
     const bytes = Buffer.from(await file.arrayBuffer());
     const valid =
-      (bytes[0] === 0xff && bytes[1] === 0xd8) ||
-      bytes.toString("ascii", 1, 4) === "PNG" ||
-      (bytes.toString("ascii", 0, 4) === "RIFF" &&
-        bytes.toString("ascii", 8, 12) === "WEBP") ||
-      bytes.toString("ascii", 4, 8) === "ftyp";
+      (file.type === "image/jpeg" && bytes[0] === 0xff && bytes[1] === 0xd8) ||
+      (file.type === "image/png" && bytes.toString("ascii", 1, 4) === "PNG") ||
+      (file.type === "image/webp" && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") ||
+      (file.type === "image/avif" && bytes.toString("ascii", 4, 8) === "ftyp");
     if (!valid) throw Error("This file does not look like a supported image.");
-    const cloud = process.env.CLOUDINARY_CLOUD_NAME,
-      key = process.env.CLOUDINARY_API_KEY,
-      secret = process.env.CLOUDINARY_API_SECRET;
-    if (!cloud || !key || !secret)
-      throw Error("Photo uploads are not configured.");
-    const timestamp = Math.floor(Date.now() / 1000),
-      folder = "campus-crochet",
-      public_id = randomUUID(),
-      signature = createHash("sha256")
-        .update(
-          `folder=${folder}&public_id=${public_id}&timestamp=${timestamp}${secret}`,
-        )
-        .digest("hex");
-    const upload = new FormData();
-    upload.set("file", new Blob([bytes], { type: file.type }), file.name);
-    for (const [k, v] of Object.entries({
-      folder,
-      public_id,
-      timestamp: String(timestamp),
-      api_key: key,
-      signature,
-    }))
-      upload.set(k, v);
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloud}/image/upload`,
-      { method: "POST", body: upload, signal: AbortSignal.timeout(60000) },
-    );
-    const result = await response.json();
-    if (!response.ok)
-      throw Error("The photo could not be uploaded. Please try again.");
+    const path = `admin/${randomUUID()}.${file.type === "image/jpeg" ? "jpg" : file.type.slice(6)}`;
+    const bucket = adminDatabase().storage.from("product_images");
+    const { error } = await bucket.upload(path, bytes, {
+      contentType: file.type, cacheControl: "31536000", upsert: false,
+    });
+    if (error) throw Error("The photo could not be uploaded. Please try again.");
     return Response.json({
-      url: result.secure_url.replace("/upload/", "/upload/f_auto,q_auto/"),
-      publicId: result.public_id,
+      url: bucket.getPublicUrl(path).data.publicUrl,
+      path,
     });
   } catch (e) {
     return errorResponse(e);

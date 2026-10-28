@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-import { loadProducts } from "@/lib/database";
-import { loadJournal } from "@/lib/content";
+import { loadProducts, loadJournal } from "@/lib/store-data";
 export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = process.env.SITE_ORIGIN || "https://campus-crochet.tech",
@@ -12,6 +11,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/contact",
     "/journey",
     "/privacy",
+    "/care",
+    "/policies",
     ...products.map((p) => `/products/${p.id}`),
     ...journal.map((p) => `/journey/${p.slug}`),
   ].map((path) => ({ url: `${origin}${path}` }));

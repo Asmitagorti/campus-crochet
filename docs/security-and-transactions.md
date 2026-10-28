@@ -1,34 +1,11 @@
-# Security and transaction verification
+# Security and transaction notes
 
-## Trust boundaries
+Supabase Auth verifies each session on the server. The API uses the verified account ID and email; it never trusts a checkout email supplied by the browser. `/admin` and every admin mutation require `asmileis4evr@gmail.com` plus the `users.role = 'admin'` profile. The designated-admin migration applies the same email and OAuth-session checks to the database's `is_admin()` function. The service role key stays server-side. The storefront migration removes direct browser table access to products, carts, users, orders and notification jobs, and restricts the SQL transaction functions to the service role. Public catalogue data is served by the storefront API. JSON and multipart requests are read with byte limits even when no `Content-Length` header is sent.
 
-Only Google-issued, verified Firebase users can place orders. Customers cannot grant themselves roles. The single admin requires both an Admin SDK custom claim and a matching singleton UID. The server verifies Firebase tokens (including revocation) before privileged operations. Firestore rules deny all browser writes to roles, products, stock, orders, payment ownership, messages and internal records. Browser access does not bypass the server checks.
+The separate admin password is stored as a salted scrypt hash in a service-role-only table. A successful check issues a one-hour HTTP-only cookie signed with the deployment secret and bound to the Supabase account and Google session. Admin APIs require both the bearer token and this cookie. Changing or removing the password hash invalidates earlier unlock cookies. Direct authenticated writes to the public product image bucket are blocked; the admin upload route uses the server service role after both checks.
 
-Prices are read from Firestore on the server and checked again in the reservation transaction. Amounts are integer INR paise. Payment signatures use timing-safe comparison, and the server checks the payment's order, currency, amount and captured status with Razorpay.
+`shop_create_order` calls the existing `cc_create_order` transaction to lock products, calculate price and reserve stock. It checks a stable checkout key and customer/bag fingerprint, then recalculates the final delivery quote from the saved product weights and an enabled exact-PIN weight slab. A changed or forged amount rolls back the reservation. The order saves the subtotal, postage, combined delivery charge, PIN, address and final amount before Razorpay starts. Rate rows and quote functions are service-role-only; admin rate edits require the designated Google account and separate password. Razorpay order creation is external to Postgres; pending attempts are stored and reconciled. `shop_capture_payment` calls the existing captured-payment transaction and queues a confirmation job after a verified provider payment. Retried callbacks return the same paid order. The admin `shop_update_fulfillment` function checks row version, paid status and forward stage progression, then queues completion only on the first transition to completed.
 
-Product/content editors use revision checks to reject stale writes. Stock reservation and release also increment product revisions, so an older admin form cannot overwrite a concurrent purchase's stock change.
+The email queue uses one event key for confirmation and one for completion per order. Resend receives that event key as an idempotency key. Ambiguous provider failures remain visible for review instead of allowing an uncontrolled duplicate send after the idempotency window. An email failure does not change a captured payment back to pending. Scheduled reconciliation handles missing browser callbacks and sends queued emails.
 
-## Atomic database operations
-
-Firestore transactions atomically create the order, unique idempotency mapping, stock reservation and reconciliation record. A competing checkout cannot reserve an already sold unit. Confirmation writes paid status and unique payment ownership together. Cancellation restores reserved inventory only while the order is pending/creating and deletes the reservation in the same transaction. Repeated callbacks and cancellations are idempotent.
-
-Firestore database commits are atomic and isolated; they cannot form a distributed ACID transaction with the external Razorpay API or Cloudinary. This boundary is handled with persisted states, idempotency, signed callbacks and reconciliation. Do not interpret these tests as a guarantee against every failure mode.
-
-## Executed checks
-
-Live Firestore tests used an isolated temporary test product (excluded from the public catalogue) and removed the fixtures afterwards:
-
-- Two concurrent requests for the final unit: exactly one committed.
-- Two cancellation attempts: stock restored exactly once.
-- Duplicate paid callbacks: one paid record, no additional stock deduction.
-- Cancellation after payment: rejected by the state transition; stock stayed deducted.
-- Forged HMAC: rejected.
-- Razorpay Orders API: accepted an unpaid test order with `currency=INR` and `amount=100` paise. No charge or payment capture occurred.
-
-The local Firebase emulator passed 15 access-control cases, including own-order access, cross-customer denial, role escalation denial, forged paid-order denial, singleton admin matching, direct admin/browser stock-write denial, and draft-content privacy. The cloud rules-test API lacked permission; the emulator was used instead. The rules have not been published.
-
-HTTP route checks passed for all top-level pages, all ten product details, a Journey article, missing-product 404 handling and anonymous denial on all four admin data/upload endpoints.
-
-Production compilation and TypeScript checks pass. Dependency audit reports no known vulnerabilities at the checked lockfile. Authenticated Google login, the visual admin UI and the complete Razorpay checkout success/failure flow still need an interactive browser smoke test; the preview's browser access policy prevented automated visual checks.
-
-Implementation references: [Razorpay Standard Checkout](https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/), [Firebase transaction isolation](https://firebase.google.com/docs/firestore/transaction-data-contention), [Cloudinary signed uploads](https://cloudinary.com/documentation/upload_images).
+The migration has to be run in the Supabase SQL Editor before the runtime can use its added fields and functions. Compilation and unit tests are necessary but cannot prove live database policy, payment gateway, OAuth or email delivery. Run the browser and provider smoke tests in [production setup](production-setup.md) before launch.

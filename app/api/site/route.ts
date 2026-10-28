@@ -1,4 +1,4 @@
-import { loadSettings } from "@/lib/content";
+import { loadSettings } from "@/lib/store-data";
 export const runtime = "nodejs";
 export async function GET() {
   try {

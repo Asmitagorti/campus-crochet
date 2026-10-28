@@ -11,7 +11,8 @@ const values = [
   "RAZORPAY_KEY_SECRET",
   "CLOUDINARY_API_SECRET",
   "CRON_SECRET",
-  "FIREBASE_ADMIN_JSON",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "RESEND_API_KEY",
 ]
   .map((k) => process.env[k])
   .filter((v) => v && v.length > 10);

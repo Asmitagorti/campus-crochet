@@ -1,4 +1,4 @@
-import { loadProducts } from "@/lib/database";
+import { loadProducts } from "@/lib/store-data";
 export const runtime = "nodejs";
 export async function GET() {
   try {

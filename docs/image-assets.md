@@ -24,7 +24,7 @@ Use case background-extraction. Remove the bedspread and any underlying white ob
 
 ## Blue plush limitation
 
-Both requested blue-plush edits were rejected by the image service. The original product photograph is retained in a paper frame in the hero. The remaining lifestyle photos retain their original backgrounds. The reference therefore is a visual direction, not a pixel-exact reproduction. Prices and stock are now managed through the Firestore-backed studio. The site does not publish fabricated customer reviews.
+Both requested blue-plush edits were rejected by the image service. The original product photograph is retained in a paper frame in the hero. The remaining lifestyle photos retain their original backgrounds. The reference therefore is a visual direction, not a pixel-exact reproduction. Prices and stock are managed through the Supabase-backed admin dashboard. The site does not publish fabricated customer reviews.
 
 ## public/images/pastel-bag-clean.png
 

@@ -5,6 +5,7 @@ import { useAuth } from "./auth-provider";
 import { Product, categories, money } from "@/lib/catalog";
 import { JournalEntry } from "@/lib/journal";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
+import { orderProgress } from "@/lib/order-progress";
 import {
   Plus,
   Upload,
@@ -23,19 +24,28 @@ type AdminProduct = Product & { active: boolean; revision: number };
 type StudioOrder = {
   mode?: string;
   id: string;
+  receipt: string;
+  version: number;
   amount: number;
+  subtotalPaise: number;
+  deliveryPaise: number;
+  postagePaise: number;
   status: string;
   fulfillment?: string;
   customer: {
     name: string;
     email: string;
     phone: string;
-    pickup: string;
-    note: string;
+    addressChoice?: string;
+    deliveryAddress?: string;
+    deliveryPin?: string;
+    pickup?: string;
+    note?: string;
   };
-  items: { name: string; quantity: number }[];
+  items: { name: string; quantity: number; price: number }[];
   created_at: string;
 };
+type DeliveryRate = { destination_pin: string; max_weight_grams: number; postage_paise: number; active: boolean; verified_at: string };
 type Message = {
   id: string;
   name: string;
@@ -47,6 +57,7 @@ type Message = {
 type Chapter = JournalEntry & { published: boolean; revision: number };
 type StudioData = {
   products: AdminProduct[];
+  deliveryRates: DeliveryRate[];
   orders: StudioOrder[];
   messages: Message[];
   journey: Chapter[];
@@ -59,6 +70,7 @@ const blank: AdminProduct = {
   category: "Accessories",
   price: 299,
   stock: 25,
+  packedWeightGrams: null,
   description: "",
   details: [["Includes", "One handmade crochet piece"]],
   colors: ["#e9b7cc"],
@@ -69,12 +81,23 @@ const blank: AdminProduct = {
 };
 export default function Studio() {
   const { user, ready, admin, login, token, error: authError } = useAuth(),
+    [access, setAccess] = useState<{ configured: boolean; unlocked: boolean } | null>(null),
+    [accessError, setAccessError] = useState(""),
+    [accessBusy, setAccessBusy] = useState(false),
+    [portalPassword, setPortalPassword] = useState(""),
+    [confirmPassword, setConfirmPassword] = useState(""),
     [data, setData] = useState<StudioData | null>(null),
-    [tab, setTab] = useState("products"),
+    [tab, setTab] = useState("orders"),
+    [orderSearch, setOrderSearch] = useState(""),
+    [orderDate, setOrderDate] = useState(""),
+    [paymentFilter, setPaymentFilter] = useState("all"),
+    [fulfillmentFilter, setFulfillmentFilter] = useState("all"),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
     [editing, setEditing] = useState<AdminProduct | null>(null),
+    [rate, setRate] = useState<{ pin: string; grams: string; rupees: string; active: boolean; existing: boolean }>({ pin: "", grams: "", rupees: "", active: true, existing: false }),
+    [rateVerified, setRateVerified] = useState(false),
     [isNew, setIsNew] = useState(false),
     [chapter, setChapter] = useState<Chapter | null>(null),
     [settings, setSettings] = useState<SiteSettings & { revision: number }>({
@@ -95,9 +118,52 @@ export default function Studio() {
       setError(e instanceof Error ? e.message : "Could not load the studio.");
     }
   }, [token]);
+  const checkAccess = useCallback(async () => {
+    setAccessError("");
+    try {
+      const response = await fetch("/api/admin/access", {
+        headers: { Authorization: `Bearer ${await token()}` },
+      });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || "Could not check admin access.");
+      setAccess({ configured: result.configured === true, unlocked: result.unlocked === true });
+    } catch (cause) {
+      setAccessError(cause instanceof Error ? cause.message : "Could not check admin access.");
+    }
+  }, [token]);
   useEffect(() => {
-    if (admin) void load();
-  }, [admin, load]);
+    if (admin) void checkAccess();
+    else { setAccess(null); setData(null); }
+  }, [admin, checkAccess]);
+  useEffect(() => {
+    if (admin && access?.unlocked) void load();
+  }, [admin, access?.unlocked, load]);
+  async function submitAccess(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!access) return;
+    if (!access.configured && portalPassword !== confirmPassword) {
+      setAccessError("The passwords do not match.");
+      return;
+    }
+    setAccessBusy(true);
+    setAccessError("");
+    try {
+      const response = await fetch("/api/admin/access", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await token()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: access.configured ? "unlock" : "setup", password: portalPassword }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || "Admin access was not unlocked.");
+      setPortalPassword("");
+      setConfirmPassword("");
+      setAccess({ configured: true, unlocked: true });
+    } catch (cause) {
+      setAccessError(cause instanceof Error ? cause.message : "Admin access was not unlocked.");
+    } finally {
+      setAccessBusy(false);
+    }
+  }
   async function save(url: string, body: unknown) {
     setBusy(true);
     setError("");
@@ -137,7 +203,7 @@ export default function Studio() {
         d = await r.json();
       if (!r.ok) throw Error(d.error);
       onDone(d.url);
-      setNotice("Photo uploaded to Cloudinary.");
+      setNotice("Photo uploaded to Supabase Storage.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
@@ -157,7 +223,7 @@ export default function Studio() {
         <h1>A little private studio</h1>
         <p>This space is reserved for the studio administrator.</p>
         {!user ? (
-          <button className="google-button" onClick={() => void login()}>
+          <button className="google-button" onClick={() => void login("/admin")}>
             Continue with Google
           </button>
         ) : (
@@ -168,13 +234,42 @@ export default function Studio() {
         {authError && <p className="form-error">{authError}</p>}
       </main>
     );
+  if (!access || !access.unlocked)
+    return (
+      <main className="page-wrap empty-state missing-page admin-access-page">
+        <LockKeyhole />
+        <h1>{access?.configured ? "Unlock the studio" : "Set your studio password"}</h1>
+        {access ? (
+          <form className="admin-access-form" onSubmit={(event) => void submitAccess(event)}>
+            <p>{access.configured ? "Enter your separate admin password to open the dashboard." :
+              "Choose a private password with at least 16 characters. You will use it after Google sign-in."}</p>
+            <div className="field">
+              <label htmlFor="admin-password">Admin password</label>
+              <input id="admin-password" type="password" autoComplete={access.configured ? "current-password" : "new-password"}
+                minLength={access.configured ? undefined : 16} maxLength={128} required
+                value={portalPassword} onChange={(event) => setPortalPassword(event.target.value)} />
+            </div>
+            {!access.configured && <div className="field">
+              <label htmlFor="admin-password-confirm">Confirm admin password</label>
+              <input id="admin-password-confirm" type="password" autoComplete="new-password" minLength={16} maxLength={128} required
+                value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+            </div>}
+            <button className="stitch-button" type="submit" disabled={accessBusy}>
+              {accessBusy ? "Checking…" : access.configured ? "Open admin dashboard" : "Set password and continue"}
+            </button>
+          </form>
+        ) : !accessError ? <p>Checking studio access…</p> : null}
+        {accessError && <p className="form-error">{accessError}</p>}
+        {!access && accessError && <button className="outline-button" onClick={() => void checkAccess()}>Try again</button>}
+      </main>
+    );
   return (
     <main className="page-wrap studio-page">
       <div className="studio-heading">
         <div>
           <span className="eyebrow">Behind the stitches</span>
-          <h1>Your little studio ♡</h1>
-          <p>Products, people and the little details.</p>
+          <h1>Admin dashboard ♡</h1>
+          <p>Orders, products and the little details.</p>
         </div>
         <button
           className="outline-button"
@@ -186,23 +281,23 @@ export default function Studio() {
       </div>
       <div className="studio-stats">
         <div>
-          <Package />
-          <strong>{data?.products.filter((p) => p.active).length || 0}</strong>
-          <span>Live products</span>
-        </div>
-        <div>
           <ShoppingBag />
-          <strong>
-            {data?.orders.filter((o) => o.status === "paid").length || 0}
-          </strong>
-          <span>Paid orders</span>
+          <strong>{data?.orders.filter((o) => o.status === "paid" && ["pending", "payment_received"].includes(o.fulfillment || "")).length || 0}</strong>
+          <span>Pending fulfillment</span>
         </div>
         <div>
-          <MessageCircle />
+          <Package />
           <strong>
-            {data?.messages.filter((m) => m.status === "new").length || 0}
+            {data?.orders.filter((o) => o.status === "paid" && orderProgress(o.status, o.fulfillment).step === 2).length || 0}
           </strong>
-          <span>New messages</span>
+          <span>In progress</span>
+        </div>
+        <div>
+          <Check />
+          <strong>
+            {data?.orders.filter((o) => o.status === "paid" && orderProgress(o.status, o.fulfillment).step === 3).length || 0}
+          </strong>
+          <span>Completed</span>
         </div>
         <div>
           <Check />
@@ -213,12 +308,13 @@ export default function Studio() {
                 .reduce((s, o) => s + o.amount, 0) || 0) / 100,
             )}
           </strong>
-          <span>Paid total (INR)</span>
+          <span>Verified revenue (INR)</span>
         </div>
       </div>
       <nav className="studio-tabs" aria-label="Studio sections">
         {[
           { id: "products", Icon: Package },
+          { id: "delivery", Icon: Package },
           { id: "orders", Icon: ShoppingBag },
           { id: "messages", Icon: MessageCircle },
           { id: "journey", Icon: BookOpen },
@@ -352,6 +448,13 @@ export default function Studio() {
                     setEditing({ ...editing, stock: Number(e.target.value) })
                   }
                 />
+              </div>
+              <div className="field">
+                <label htmlFor="packed-weight">Packed shipping weight (grams)</label>
+                <input id="packed-weight" type="number" min={1} max={50000} step={1}
+                  value={editing.packedWeightGrams ?? ""} placeholder="Weigh the packed parcel"
+                  onChange={(e) => setEditing({ ...editing, packedWeightGrams: e.target.value ? Number(e.target.value) : null })} />
+                <small>Needed for delivery outside Aditya Surampalem. Include packaging.</small>
               </div>
             </div>
             <div className="field">
@@ -530,38 +633,72 @@ export default function Studio() {
             </div>
           </>
         ))}
+      {tab === "delivery" && (
+        <section>
+          <h2>Delivery rates</h2>
+          <p className="quiet-note">Origin: Kakinada HO 533001 · India Post Parcel Retail. Enter the full payable quote including tax from <a href="https://www.indiapost.gov.in/calculate-postage" target="_blank" rel="noreferrer">India Post’s calculator</a>. The customer pays this amount plus ₹15, shown as one delivery charge.</p>
+          <form className="paper-form studio-editor" onSubmit={(event) => {
+            event.preventDefault();
+            if (!/^\d+(\.\d{1,2})?$/.test(rate.rupees)) { setError("Enter the exact quoted rupees and paise."); return; }
+            void save("/api/admin/delivery-rates", {
+              destinationPin: rate.pin, maxWeightGrams: Number(rate.grams),
+              postagePaise: Math.round(Number(rate.rupees) * 100), active: rate.active, verified: rateVerified,
+            }).then((ok) => { if (ok) { setRate({ pin: "", grams: "", rupees: "", active: true, existing: false }); setRateVerified(false); } });
+          }}>
+            <div className="form-columns">
+              <div className="field"><label htmlFor="rate-pin">Destination PIN</label><input id="rate-pin" inputMode="numeric" pattern="[1-9][0-9]{5}" maxLength={6} required disabled={rate.existing} value={rate.pin} onChange={(event) => setRate({ ...rate, pin: event.target.value })} /></div>
+              <div className="field"><label htmlFor="rate-grams">Weight slab up to (grams)</label><input id="rate-grams" type="number" min={1} max={50000} step={1} required disabled={rate.existing} value={rate.grams} onChange={(event) => setRate({ ...rate, grams: event.target.value })} /></div>
+              <div className="field"><label htmlFor="rate-price">India Post payable quote (₹, including tax)</label><input id="rate-price" type="number" min={0.01} max={10000} step={0.01} required value={rate.rupees} onChange={(event) => setRate({ ...rate, rupees: event.target.value })} /></div>
+            </div>
+            <label className="consent"><input type="checkbox" checked={rate.active} onChange={(event) => setRate({ ...rate, active: event.target.checked })} /> Enable this PIN and weight slab</label>
+            <label className="consent"><input type="checkbox" checked={rateVerified} onChange={(event) => setRateVerified(event.target.checked)} required={rate.active} /> I checked the full payable quote from 533001 in India Post’s calculator.</label>
+            <button className="stitch-button" disabled={busy}>{busy ? "Saving…" : "Save delivery rate"}</button>
+          </form>
+          {data?.deliveryRates.map((entry) => <article className="studio-record editor-top" key={`${entry.destination_pin}/${entry.max_weight_grams}`}>
+            <div><h3>{entry.destination_pin} · up to {entry.max_weight_grams} g</h3><p>India Post {money(entry.postage_paise / 100)} · Customer delivery {money((entry.postage_paise + 1500) / 100)} · {entry.active ? "Enabled" : "Disabled"}</p></div>
+            <button className="outline-button" type="button" onClick={() => { setRate({ pin: entry.destination_pin, grams: String(entry.max_weight_grams), rupees: (entry.postage_paise / 100).toFixed(2), active: entry.active, existing: true }); setRateVerified(false); }}>Edit</button>
+          </article>)}
+          {!data?.deliveryRates.length && <p>No delivery rates are enabled yet. Add a verified destination to offer “Others” checkout.</p>}
+        </section>
+      )}
       {tab === "orders" && (
         <section>
           <h2>Little things, on their way</h2>
-          <p className="quiet-note">
-            Latest 100 orders. Payment status is verified by the server and
-            cannot be edited here.
-          </p>
+          <p className="quiet-note">Payment status is verified by the server and cannot be edited here.</p>
+          <div className="order-filters">
+            <label>Search order or customer<input type="search" value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} placeholder="ID, name or email" /></label>
+            <label>Date<input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></label>
+            <label>Payment<select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}><option value="all">All</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="cancelled">Cancelled</option></select></label>
+            <label>Fulfillment<select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)}><option value="all">All</option><option value="payment_received">Payment received</option><option value="yarn_selected">Yarn selected</option><option value="crocheting">Crocheting</option><option value="quality_check">Quality check</option><option value="ready">Ready</option><option value="completed">Completed</option><option value="collected">Collected</option></select></label>
+          </div>
           {!data?.orders.length && (
             <p className="loading-note">
               The first little order is still to come.
             </p>
           )}
-          {data?.orders.map((o) => (
+          {data?.orders.filter((o) => {
+            const query = orderSearch.trim().toLowerCase();
+            return (!query || [o.id, o.receipt, o.customer.name, o.customer.email].some((v) => v.toLowerCase().includes(query))) &&
+              (!orderDate || o.created_at.slice(0, 10) === orderDate) &&
+              (paymentFilter === "all" || o.status === paymentFilter) &&
+              (fulfillmentFilter === "all" || o.fulfillment === fulfillmentFilter);
+          }).map((o) => (
             <article className="studio-record" key={o.id}>
               <div className="editor-top">
                 <h3>
-                  {o.id} {o.mode === "test" && <small>· TEST</small>}
+                  {o.receipt} {o.mode === "test" && <small>· TEST</small>}
                 </h3>
-                <span className="status-pill">{o.fulfillment || o.status}</span>
+                <span className="status-pill">{orderProgress(o.status, o.fulfillment).label}</span>
                 <strong>{money(o.amount / 100)}</strong>
               </div>
-              <p>
-                {o.customer.name} · {o.customer.email} ·{" "}
-                <a href={`tel:${o.customer.phone}`}>{o.customer.phone}</a>
-              </p>
-              <p>Pickup: {o.customer.pickup}</p>
-              {o.items.map((i, index) => (
-                <p key={index}>
-                  {i.name} × {i.quantity}
-                </p>
-              ))}
-              {o.customer.note && <p>Note: {o.customer.note}</p>}
+              <p>{new Date(o.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} · {o.customer.name} · {o.customer.email}</p>
+              <p>Payment: {o.status} · Fulfillment: {orderProgress(o.status, o.fulfillment).label}</p>
+              <details className="order-details"><summary>View order details</summary>
+                <p>Mobile: {o.customer.phone}</p>
+                <p>Delivery: {o.customer.addressChoice || o.customer.pickup || "Not recorded"}{o.customer.deliveryAddress ? ` · ${o.customer.deliveryAddress}` : ""}{o.customer.deliveryPin ? ` · ${o.customer.deliveryPin}` : ""}</p>
+                {o.items.map((i, index) => <p key={index}>{i.name} × {i.quantity} · {money(i.price * i.quantity)}</p>)}
+                <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery charge: {money(o.deliveryPaise / 100)} · Paid total: {money(o.amount / 100)}</p>
+              </details>
               {o.status === "paid" && (
                 <label className="field">
                   Fulfilment
@@ -571,15 +708,17 @@ export default function Studio() {
                       void save("/api/admin/content", {
                         type: "order",
                         id: o.id,
+                        version: o.version,
                         fulfillment: e.target.value,
                       })
                     }
                   >
-                    <option value="" disabled>
-                      Choose next stage
-                    </option>
-                    <option value="preparing">Preparing</option>
-                    <option value="ready_for_pickup">Ready for pickup</option>
+                    <option value="payment_received">Payment received</option>
+                    <option value="yarn_selected">Yarn selected</option>
+                    <option value="crocheting">Crocheting</option>
+                    <option value="quality_check">Quality check</option>
+                    <option value="ready">Ready</option>
+                    <option value="completed">Completed</option>
                     <option value="collected">Collected</option>
                   </select>
                 </label>
@@ -658,7 +797,7 @@ export default function Studio() {
             ).map((k) => (
               <div className="field" key={k}>
                 <label htmlFor={`chapter-${k}`}>
-                  {k === "image" ? "Cloudinary cover photo URL" : k}
+                  {k === "image" ? "Cover photo URL" : k}
                 </label>
                 <input
                   id={`chapter-${k}`}

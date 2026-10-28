@@ -4,7 +4,7 @@ import Contact from "@/components/contact-page";
 export const metadata: Metadata = {
   title: "A little hello | Campus-Crochet",
   description:
-    "Ask about a crochet piece, your order or a custom idea. Call or WhatsApp +91 76749 71144.",
+    "Ask about a crochet piece, an order, payment or a custom idea at support@campus-crochet.tech.",
 };
 export default function ContactPage() {
   return (

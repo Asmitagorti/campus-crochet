@@ -3,12 +3,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  Phone,
-  MessageCircle,
+  Mail,
   ArrowRight,
   Heart,
   Check,
-  MapPin,
 } from "lucide-react";
 import { useShop } from "./site-shell";
 import { Sprig } from "./design";
@@ -69,41 +67,18 @@ export default function Contact() {
             your little happy thing.
           </h2>
           <p>{settings.contactIntro}</p>
-          <a
-            className="contact-method"
-            href={`https://wa.me/91${settings.phone}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <MessageCircle />
+          <a className="contact-method" href="mailto:support@campus-crochet.tech">
+            <Mail />
             <div>
-              <strong>Drop a WhatsApp</strong>
-              <span>+91 {settings.phone}</span>
+              <strong>Customer support</strong>
+              <span>support@campus-crochet.tech</span>
             </div>
             <ArrowRight size={17} />
           </a>
-          <a className="contact-method" href={`tel:+91${settings.phone}`}>
-            <Phone />
-            <div>
-              <strong>A little phone call</strong>
-              <span>+91 {settings.phone}</span>
-            </div>
-            <ArrowRight size={17} />
-          </a>
-          <div className="contact-method">
-            <MapPin />
-            <div>
-              <strong>Starting close to home</strong>
-              <span>{settings.pickupNote}</span>
-            </div>
-          </div>
           <div className="small-paper-note">
             <Heart />
-            <h3>A little patience, please ♡</h3>
-            <p>
-              Between classes and crochet, replies can take a few days. For a
-              time-sensitive question, call or WhatsApp us.
-            </p>
+            <h3>Here to help ♡</h3>
+            <p>For order questions, payment issues and other website queries, email support and include your order reference if you have one.</p>
           </div>
         </section>
         <section className="paper-form">
@@ -113,27 +88,17 @@ export default function Contact() {
               <h2>Your hello is here ♡</h2>
               <p>Your message has been saved for the studio.</p>
               <span className="reference">{reference}</span>
-              <p>
-                Keep this reference. For a quicker conversation, send us a
-                WhatsApp.
-              </p>
-              <a
-                className="stitch-button"
-                href={`https://wa.me/91${settings.phone}?text=${encodeURIComponent(`Hello! I sent a message on Campus-Crochet. My reference is ${reference}.`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Continue on WhatsApp <ArrowRight size={15} />
-              </a>
+              <p>Keep this reference for any follow-up.</p>
+              <a className="stitch-button" href={`mailto:support@campus-crochet.tech?subject=${encodeURIComponent(`Support request ${reference}`)}`}>Email support <ArrowRight size={15} /></a>
               <button className="text-link" onClick={() => setReference("")}>
-                Send another little note
+                Send another message
               </button>
             </div>
           ) : (
             <form onSubmit={submit}>
-              <h2>Leave a little note</h2>
+              <h2>Send a message</h2>
               <p className="form-intro">
-                We will keep it between you and the studio.
+                This form saves your message for the studio dashboard. For an email conversation, write to <a href="mailto:support@campus-crochet.tech">support@campus-crochet.tech</a>.
               </p>
               <div className="field">
                 <label htmlFor="name">
@@ -239,7 +204,7 @@ export default function Contact() {
           },
           {
             q: "How will I get my order?",
-            a: "We are starting with campus pickup. Add your campus and pickup details at checkout. We will coordinate the handover with you by phone or WhatsApp.",
+            a: "Choose Aditya Surampalem for delivery included in the product price. For other addresses, enter your PIN at checkout to see whether delivery is available and the full charge before payment.",
           },
           {
             q: "Can I ask for exact measurements?",
@@ -251,7 +216,7 @@ export default function Contact() {
           },
           {
             q: "Something is wrong with my order. What do I do?",
-            a: "Please call or WhatsApp us with your order reference and photographs of the issue. We will review the details with you and agree on the next step.",
+            a: "Email support@campus-crochet.tech with your order reference and photographs of the issue. We will review the details with you and discuss the next step.",
           },
         ].map((x) => (
           <details key={x.q}>

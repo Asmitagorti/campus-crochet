@@ -1308,6 +1308,18 @@ input[type="checkbox"] {
   color: #4285f4;
   font-family: Arial, sans-serif;
 }
+.admin-access-form {
+  width: min(100%, 380px);
+  margin: 20px auto 0;
+  text-align: left;
+}
+.admin-access-form > p {
+  margin-bottom: 18px;
+}
+.admin-access-form .stitch-button {
+  width: 100%;
+  justify-content: center;
+}
 .payment-recovery {
   margin: 25px 0;
 }
@@ -1431,6 +1443,17 @@ input[type="checkbox"] {
   align-items: center;
   gap: 7px;
 }
+.account-toolbar .account-signout {
+  background: var(--brown);
+  color: #fff;
+  border-radius: 7px;
+  padding: 9px 14px;
+  font-weight: 700;
+}
+.account-guidance { font-size: 12px; line-height: 1.7; color: var(--muted); margin-top: 18px; }
+.order-progress { display: flex; padding: 0; margin: 20px 0 5px; list-style: none; gap: 5px; }
+.order-progress li { flex: 1; position: relative; border-top: 4px solid var(--line); padding-top: 7px; font-size: 10px; color: var(--muted); }
+.order-progress li.done { border-color: var(--brown); color: var(--ink); font-weight: 700; }
 .account-orders {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1548,6 +1571,13 @@ input[type="checkbox"] {
   width: 22px;
   stroke-width: 1.2;
 }
+.order-filters { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 12px; margin: 22px 0; }
+.order-filters label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 700; }
+.order-filters input, .order-filters select { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper-light); color: var(--ink); }
+.order-details { margin: 12px 0; font-size: 12px; }
+.order-details summary { cursor: pointer; font-weight: 700; text-decoration: underline; }
+@media (max-width: 800px) { .order-filters { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 500px) { .order-filters { grid-template-columns: 1fr; } }
 .studio-tabs {
   display: flex;
   gap: 10px;
@@ -1810,6 +1840,14 @@ input[type="checkbox"] {
   header nav.open {
     display: flex;
   }
+  .nav-signout {
+    display: inline-flex;
+    align-items: center;
+    border-left: 1px solid var(--line);
+    padding-left: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
   .mobile-menu {
     display: grid;
   }
@@ -1984,6 +2022,13 @@ input[type="checkbox"] {
     padding: 20px 5%;
     font-size: 12px;
     flex-wrap: wrap;
+  }
+  .nav-signout {
+    width: 100%;
+    justify-content: flex-end;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 12px 0 0;
   }
   .header-actions {
     gap: 2px;

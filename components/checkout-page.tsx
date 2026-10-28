@@ -28,13 +28,21 @@ type Attempt = {
   key: string;
   testMode: boolean;
   payment?: PaymentResult;
+  accountId?: string;
 };
 type Receipt = {
   id: string;
+  receipt: string;
   amount: number;
+  subtotalPaise: number;
+  deliveryPaise: number;
+  deliveryChoice: string;
+  deliveryAddress: string;
+  deliveryPin: string;
   items: { id: string; name: string; quantity: number; price: number }[];
   status: string;
 };
+type DeliveryQuote = { subtotalPaise: number; deliveryPaise: number; totalPaise: number };
 type RazorpayOptions = {
   key: string;
   amount: number;
@@ -63,7 +71,7 @@ export default function Checkout({
   testMode: boolean;
   nonce?: string;
 }) {
-  const { cart, setQuantity, ready, catalog, stocks } = useShop(),
+  const { cart, refreshPreferences, ready, catalog, stocks } = useShop(),
     { user, login, token, error: authError } = useAuth(),
     params = useSearchParams(),
     buy = params.get("buy"),
@@ -83,45 +91,85 @@ export default function Checkout({
         .filter((p) => cart[p.id] > 0)
         .map((p) => ({ ...p, quantity: cart[p.id] }));
   const total = items.reduce((s, p) => s + p.price * p.quantity, 0),
+    [addressChoice, setAddressChoice] = useState<"Aditya Surampalem" | "Others">("Aditya Surampalem"),
+    [deliveryPin, setDeliveryPin] = useState(""),
+    [deliveryQuote, setDeliveryQuote] = useState<{ key: string; value: DeliveryQuote } | null>(null),
+    [quoteError, setQuoteError] = useState(""),
+    [quoting, setQuoting] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [scriptReady, setScriptReady] = useState(false),
     [attempt, setAttempt] = useState<Attempt | null>(null),
-    [receipt, setReceipt] = useState<Receipt | null>(null);
-  const key = useRef(""),
-    purchased = useRef(items.map((p) => ({ id: p.id, quantity: p.quantity })));
+    [receipt, setReceipt] = useState<Receipt | null>(null),
+    [receiptOwner, setReceiptOwner] = useState<string | null>(null);
+  const activeAttempt = user && attempt?.accountId === user.uid ? attempt : null;
+  const activeReceipt = user && receiptOwner === user.uid ? receipt : null;
+  const itemSignature = JSON.stringify(items.map((item) => [item.id, item.quantity, item.price]));
+  const quoteKey = JSON.stringify([deliveryPin, itemSignature]);
+  const liveQuote = addressChoice === "Others" && deliveryQuote?.key === quoteKey ? deliveryQuote.value : null;
   useEffect(() => {
+    setDeliveryQuote(null);
+    setQuoteError("");
+    setQuoting(false);
+    if (addressChoice !== "Others" || !user || !/^[1-9]\d{5}$/.test(deliveryPin) || !items.length) return;
+    const controller = new AbortController();
+    setQuoting(true);
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch("/api/delivery/quote", {
+          method: "POST", signal: controller.signal,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
+          body: JSON.stringify({ deliveryPin, items: JSON.parse(itemSignature).map(([id, quantity]: [string, number, number]) => ({ id, quantity })) }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw Error(result.error || "Delivery quote is unavailable.");
+        if (result.subtotalPaise !== Math.round(total * 100)) throw Error("A product price changed. Refresh checkout before paying.");
+        if (!controller.signal.aborted) setDeliveryQuote({ key: quoteKey, value: result as DeliveryQuote });
+      } catch (cause) {
+        if (!controller.signal.aborted) setQuoteError(cause instanceof Error ? cause.message : "Delivery quote is unavailable.");
+      } finally { if (!controller.signal.aborted) setQuoting(false); }
+    }, 350);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [addressChoice, deliveryPin, itemSignature, quoteKey, total, user?.uid, token]);
+  const key = useRef("");
+  const liveUserUid = useRef<string | null>(null);
+  liveUserUid.current = user?.uid || null;
+  useEffect(() => {
+    setAttempt(null);
+    setReceipt(null);
+    setReceiptOwner(null);
+    if (!user) return;
     key.current = crypto.randomUUID();
     try {
       const saved = sessionStorage.getItem("campus-payment");
-      if (saved) setAttempt(JSON.parse(saved));
+      if (saved) {
+        const previous = JSON.parse(saved) as Attempt;
+        if (previous.accountId === user.uid) setAttempt(previous);
+        else sessionStorage.removeItem("campus-payment");
+      }
     } catch {}
-  }, []);
-  useEffect(() => {
-    purchased.current = items.map((p) => ({ id: p.id, quantity: p.quantity }));
-  }, [items]);
+  }, [user?.uid]);
   function remember(value: Attempt | null) {
-    setAttempt(value);
-    if (value) sessionStorage.setItem("campus-payment", JSON.stringify(value));
+    if (liveUserUid.current !== (user?.uid || null)) return;
+    const ownedValue = value ? { ...value, accountId: user?.uid } : null;
+    setAttempt(ownedValue);
+    if (ownedValue) sessionStorage.setItem("campus-payment", JSON.stringify(ownedValue));
     else sessionStorage.removeItem("campus-payment");
   }
   async function readReceipt(value: Attempt) {
     const response = await fetch("/api/orders/status", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
         body: JSON.stringify({ id: value.id, token: value.token }),
       }),
       data = await response.json();
     if (!response.ok) throw Error(data.error);
     if (data.status === "paid") {
+      if (liveUserUid.current !== user?.uid) return false;
       setReceipt(data);
+      setReceiptOwner(user?.uid || null);
       remember(null);
-      if (!buy)
-        for (const item of purchased.current)
-          setQuantity(
-            item.id,
-            Math.max(0, (cart[item.id] || 0) - item.quantity),
-          );
+      if (!buy) await refreshPreferences();
       return true;
     }
     return false;
@@ -133,7 +181,7 @@ export default function Checkout({
     try {
       const response = await fetch("/api/payments/verify", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
           body: JSON.stringify({ id: value.id, token: value.token, ...result }),
         }),
         data = await response.json();
@@ -154,7 +202,7 @@ export default function Checkout({
     try {
       const response = await fetch("/api/payments/cancel", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
           body: JSON.stringify({ id: value.id, token: value.token }),
         }),
         data = await response.json();
@@ -180,13 +228,17 @@ export default function Checkout({
   }
   async function pay(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (addressChoice === "Others" && !liveQuote) {
+      setError("Enter a supported PIN and wait for the delivery quote before paying.");
+      return;
+    }
     if (!scriptReady || !window.Razorpay) {
       setError(
         "Secure checkout is still loading. Please try again in a moment.",
       );
       return;
     }
-    if (attempt) {
+    if (activeAttempt) {
       setError(
         "Please finish or cancel the saved payment attempt below first.",
       );
@@ -206,7 +258,8 @@ export default function Checkout({
           body: JSON.stringify({
             ...fields,
             consent: fields.consent === "on",
-            expectedAmount: total * 100,
+            expectedAmount: addressChoice === "Others" ? liveQuote!.totalPaise : Math.round(total * 100),
+            directBuy: !!buy,
             items: items.map((p) => ({ id: p.id, quantity: p.quantity })),
           }),
         }),
@@ -228,7 +281,7 @@ export default function Checkout({
         description: `Your handmade little things · ${value.id}`,
         prefill: {
           name: String(fields.name),
-          email: String(fields.email),
+          email: user?.email || "",
           contact: String(fields.phone),
         },
         theme: { color: "#87502c" },
@@ -252,7 +305,7 @@ export default function Checkout({
       setBusy(false);
     }
   }
-  if (receipt)
+  if (activeReceipt)
     return (
       <main className="page-wrap receipt-page">
         <div className="receipt-check">
@@ -272,12 +325,12 @@ export default function Checkout({
         <p>
           {testMode
             ? "No real money was charged. This order is recorded in the test shop."
-            : "Your payment is confirmed. We will coordinate campus pickup with you."}
+            : "Your payment is confirmed. Follow this order in your account for updates."}
         </p>
         <div className="receipt-paper">
           <span>Keep this little reference</span>
-          <h2>{receipt.id}</h2>
-          {receipt.items.map((i) => (
+          <h2>{activeReceipt.receipt}</h2>
+          {activeReceipt.items.map((i) => (
             <div className="receipt-item" key={i.id}>
               <span>
                 {i.name} × {i.quantity}
@@ -285,24 +338,19 @@ export default function Checkout({
               <strong>{money(i.price * i.quantity)}</strong>
             </div>
           ))}
+          <div className="total-line"><span>Subtotal</span><strong>{money(activeReceipt.subtotalPaise / 100)}</strong></div>
+          <div className="total-line"><span>Delivery</span><strong>{activeReceipt.deliveryPaise ? money(activeReceipt.deliveryPaise / 100) : "Included"}</strong></div>
           <div className="total-line">
             <strong>Paid total (INR)</strong>
-            <strong>{money(receipt.amount / 100)}</strong>
+            <strong>{money(activeReceipt.amount / 100)}</strong>
           </div>
-          <p>Campus pickup · We will arrange the handover with you.</p>
+          <p>Delivery location: {activeReceipt.deliveryChoice}{activeReceipt.deliveryAddress ? ` · ${activeReceipt.deliveryAddress}` : ""}{activeReceipt.deliveryPin ? ` · ${activeReceipt.deliveryPin}` : ""}. Check your account for progress.</p>
         </div>
         <div className="receipt-actions">
           <Link className="stitch-button" href="/account">
             Your orders <ArrowRight size={15} />
           </Link>
-          <a
-            className="outline-button"
-            target="_blank"
-            rel="noopener noreferrer"
-            href={`https://wa.me/917674971144?text=${encodeURIComponent(`Hello! My Campus-Crochet order is ${receipt.id}. Can we arrange campus pickup?`)}`}
-          >
-            Arrange pickup on WhatsApp
-          </a>
+          <a className="outline-button" href={`mailto:support@campus-crochet.tech?subject=${encodeURIComponent(`Order ${activeReceipt.receipt}`)}`}>Ask support about this order</a>
         </div>
       </main>
     );
@@ -341,17 +389,17 @@ export default function Checkout({
           {error}
         </p>
       )}
-      {attempt && (
+      {activeAttempt && (
         <section className="payment-recovery paper-form">
           <h2>A little payment to finish</h2>
           <p>
-            Reference: {attempt.id}. Check this payment before starting another.
+            Reference: {activeAttempt.id}. Check this payment before starting another.
           </p>
-          {attempt.payment ? (
+          {activeAttempt.payment ? (
             <button
               disabled={busy}
               className="stitch-button"
-              onClick={() => void verify(attempt, attempt.payment!)}
+              onClick={() => void verify(activeAttempt, activeAttempt.payment!)}
             >
               Retry payment verification
             </button>
@@ -359,19 +407,17 @@ export default function Checkout({
             <button
               className="stitch-button"
               disabled={busy}
-              onClick={() => void cancel(attempt)}
+              onClick={() => void cancel(activeAttempt)}
             >
               Check status / cancel attempt
             </button>
           )}
-          <a href="tel:+917674971144" className="text-link">
-            Need a hand? Call the studio
-          </a>
+          <a href="mailto:support@campus-crochet.tech" className="text-link">Need a hand? Email support</a>
         </section>
       )}
       {!ready ? (
         <p className="loading-note">Getting your little bag ready…</p>
-      ) : !items.length && !attempt ? (
+      ) : !items.length && !activeAttempt ? (
         <div className="empty-state">
           <ShoppingBag />
           <h2>Your little bag is waiting.</h2>
@@ -384,13 +430,12 @@ export default function Checkout({
         items.length > 0 && (
           <div className="checkout-layout">
             <section className="paper-form">
-              <h2>A little about you</h2>
+              <h2>A Little About You</h2>
               {!user ? (
                 <div className="checkout-signin">
                   <LockKeyhole />
                   <p>
-                    Sign in with Google to securely place your order and keep it
-                    in your own little corner.
+                    Sign in to place your order and keep it in your account.
                   </p>
                   <button
                     className="google-button"
@@ -404,7 +449,7 @@ export default function Checkout({
                 <form onSubmit={pay}>
                   <p className="form-intro">Signed in as {user.email}</p>
                   <div className="field">
-                    <label htmlFor="checkout-name">Your name *</label>
+                    <label htmlFor="checkout-name">Full name *</label>
                     <input
                       id="checkout-name"
                       name="name"
@@ -416,54 +461,49 @@ export default function Checkout({
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="checkout-email">Email address *</label>
+                    <label htmlFor="checkout-email">Registered email address</label>
                     <input
                       id="checkout-email"
-                      name="email"
                       type="email"
-                      required
-                      defaultValue={user.email || ""}
+                      value={user.email || ""}
+                      readOnly
                       autoComplete="email"
                     />
                   </div>
                   <div className="field">
                     <label htmlFor="checkout-phone">
-                      Mobile / WhatsApp number *
+                      Indian mobile number *
                     </label>
                     <input
                       id="checkout-phone"
                       name="phone"
                       type="tel"
                       required
-                      pattern="(?:\+?91[ -]?)?[6-9][0-9]{9}"
+                      pattern="[6-9][0-9]{9}"
+                      minLength={10}
+                      maxLength={10}
                       placeholder="Your 10-digit mobile number"
                       autoComplete="tel"
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="pickup">Campus & pickup details *</label>
-                    <input
-                      id="pickup"
-                      name="pickup"
-                      required
-                      minLength={3}
-                      maxLength={200}
-                      placeholder="Campus, department or preferred meeting point"
-                    />
-                    <small>
-                      We will confirm a time and meeting point with you.
-                    </small>
+                    <label htmlFor="address-choice">Address *</label>
+                    <select id="address-choice" name="addressChoice" value={addressChoice} onChange={(e) => setAddressChoice(e.target.value as "Aditya Surampalem" | "Others")}>
+                      <option value="Aditya Surampalem">Aditya Surampalem</option>
+                      <option value="Others">Others</option>
+                    </select>
                   </div>
-                  <div className="field">
-                    <label htmlFor="order-note">A little note (optional)</label>
-                    <textarea
-                      id="order-note"
-                      name="note"
-                      rows={3}
-                      maxLength={1500}
-                      placeholder="A gift message, a question, or anything we should know"
-                    />
-                  </div>
+                  {addressChoice === "Others" && <div className="field">
+                    <label htmlFor="delivery-address">Complete delivery address *</label>
+                    <textarea id="delivery-address" name="deliveryAddress" required minLength={15} maxLength={500} rows={3} placeholder="Building, street, area, city and state" />
+                    <small>Include your flat or house number, street, area, city and state.</small>
+                  </div>}
+                  {addressChoice === "Others" && <div className="field">
+                    <label htmlFor="delivery-pin">Delivery PIN code *</label>
+                    <input id="delivery-pin" name="deliveryPin" inputMode="numeric" autoComplete="postal-code" required pattern="[1-9][0-9]{5}" maxLength={6} value={deliveryPin} onChange={(e) => setDeliveryPin(e.target.value)} placeholder="Six-digit PIN" />
+                    {quoting && <small>Checking the delivery charge…</small>}
+                    {quoteError && <small className="form-error" role="alert">{quoteError}</small>}
+                  </div>}
                   <div className="honeypot" aria-hidden="true">
                     <input
                       name="website"
@@ -483,8 +523,9 @@ export default function Checkout({
                     className="stitch-button full-button"
                     disabled={
                       busy ||
+                      (addressChoice === "Others" && !liveQuote) ||
                       !scriptReady ||
-                      !!attempt ||
+                      !!activeAttempt ||
                       items.some(
                         (p) => (stocks[p.id] ?? p.stock ?? 0) < p.quantity,
                       )
@@ -492,7 +533,7 @@ export default function Checkout({
                   >
                     {busy
                       ? "Opening secure checkout…"
-                      : `Pay ${money(total)} with Razorpay`}{" "}
+                      : addressChoice === "Others" && !liveQuote ? "Enter a supported PIN for delivery" : `Pay ${money((addressChoice === "Others" ? liveQuote!.totalPaise : Math.round(total * 100)) / 100)} with Razorpay`}{" "}
                     <LockKeyhole size={16} />
                   </button>
                   <p className="quiet-note">
@@ -528,19 +569,17 @@ export default function Checkout({
                 <strong>{money(total)}</strong>
               </div>
               <div className="total-line">
-                <span>Campus pickup</span>
-                <span>Included</span>
+                <span>Delivery</span>
+                <span>{addressChoice === "Others" ? liveQuote ? money(liveQuote.deliveryPaise / 100) : "Enter PIN for quote" : "Included"}</span>
               </div>
               <div className="total-line grand-total">
                 <strong>Total (INR)</strong>
-                <strong>{money(total)}</strong>
+                <strong>{addressChoice === "Others" ? liveQuote ? money(liveQuote.totalPaise / 100) : "Pending delivery quote" : money(total)}</strong>
               </div>
               <div className="pickup-note">
                 <MapPin size={20} />
                 <p>
-                  Starting close to home.
-                  <br />
-                  Campus pickup, thoughtfully arranged.
+                  {addressChoice === "Others" ? liveQuote ? `Your delivery charge includes India Post postage and ₹15. Shipping from Kakinada 533001 to ${deliveryPin}.` : "Only PIN codes with a verified India Post quote are available for online payment." : "Delivery in Aditya Surampalem is included."}
                 </p>
               </div>
               <Link className="text-link" href="/shop">

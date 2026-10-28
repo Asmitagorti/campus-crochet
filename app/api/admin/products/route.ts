@@ -1,98 +1,52 @@
 import { validImage } from "@/lib/image-url";
-import { requireAdmin, firestore } from "@/lib/firebase-admin";
+import { adminDatabase } from "@/lib/supabase-admin";
+import { requireAdminAccess } from "@/lib/admin-access";
+import { loadProducts } from "@/lib/store-data";
 import { guard, text, errorResponse } from "@/lib/forms";
 import { categories } from "@/lib/catalog";
+import { readJsonBody } from "@/lib/request-body";
+
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin(request);
+    await requireAdminAccess(request);
     await guard(request, 60);
-    const b = await request.json(),
-      id = text(b.id, 70),
-      name = text(b.name, 100),
-      description = text(b.description, 5000),
-      note = text(b.note, 160);
-    if (
-      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ||
-      name.length < 3 ||
-      description.length < 20
-    )
+    const body = await readJsonBody(request);
+    const slug = text(body.id, 70), name = text(body.name, 100);
+    const description = text(body.description, 5000), note = text(body.note, 160);
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || name.length < 3 || description.length < 20)
       throw Error("Please provide a valid slug, name and description.");
-    if (
-      !Number.isInteger(b.price) ||
-      b.price < 1 ||
-      b.price > 100000 ||
-      !Number.isInteger(b.stock) ||
-      b.stock < 0 ||
-      b.stock > 100000
-    )
+    if (!Number.isInteger(body.price) || body.price < 1 || body.price > 100000 ||
+      !Number.isInteger(body.stock) || body.stock < 0 || body.stock > 100000)
       throw Error("Price and stock must be valid whole numbers.");
-    if (!categories.some((c) => c.name === b.category))
-      throw Error("Please select a collection.");
-    if (
-      !Array.isArray(b.gallery) ||
-      b.gallery.length < 1 ||
-      b.gallery.length > 8 ||
-      !b.gallery.every(validImage)
-    )
-      throw Error("Add between one and eight Cloudinary photos.");
-    if (
-      !Array.isArray(b.colors) ||
-      b.colors.length > 8 ||
-      !b.colors.every(
-        (c: unknown) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c),
-      )
-    )
+    if (body.packedWeightGrams != null && (!Number.isInteger(body.packedWeightGrams) ||
+      body.packedWeightGrams < 1 || body.packedWeightGrams > 50000))
+      throw Error("Packed weight must be a whole number of grams between 1 and 50,000.");
+    if (!categories.some((category) => category.name === body.category)) throw Error("Please select a collection.");
+    if (!Array.isArray(body.gallery) || body.gallery.length < 1 || body.gallery.length > 8 || !body.gallery.every(validImage))
+      throw Error("Add between one and eight photos from Supabase Storage.");
+    if (!Array.isArray(body.colors) || body.colors.length > 8 ||
+      !body.colors.every((color: unknown) => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)))
       throw Error("Use valid six-digit colour codes.");
-    if (
-      !Array.isArray(b.details) ||
-      b.details.length > 20 ||
-      !b.details.every(
-        (d: unknown) =>
-          Array.isArray(d) &&
-          d.length === 2 &&
-          d.every((v) => typeof v === "string" && v.length < 400),
-      )
-    )
+    if (!Array.isArray(body.details) || body.details.length > 20 ||
+      !body.details.every((detail: unknown) => Array.isArray(detail) && detail.length === 2 &&
+        detail.every((value: unknown) => typeof value === "string" && value.length < 400)))
       throw Error("Please check product specifications.");
-    const f = firestore(),
-      ref = f.doc(`products/${id}`);
-    await f.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      if (b.create && snap.exists)
-        throw Error("That product slug already exists.");
-      if (!b.create && !snap.exists) throw Error("Product not found.");
-      if (snap.exists && b.revision !== snap.data()!.revision)
-        throw Error(
-          "This product changed in another session. Refresh before saving.",
-        );
-      tx.set(ref, {
-        id,
-        name,
-        note,
-        description,
-        category: b.category,
-        price: b.price,
-        stock: b.stock,
-        details: b.details.map(([key, value]: string[]) => ({ key, value })),
-        colors: b.colors,
-        gallery: b.gallery,
-        active: b.active === true,
-        madeToOrder: false,
-        revision: (snap.data()?.revision || 0) + 1,
-        createdAt: snap.data()?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        updatedBy: admin.uid,
-      });
-      tx.create(f.collection("audit_log").doc(), {
-        actor: admin.uid,
-        action: b.create ? "product.create" : "product.update",
-        target: id,
-        at: new Date().toISOString(),
-      });
+    if (!Number.isInteger(body.revision) || body.revision < 0) throw Error("Refresh this product before saving.");
+    let databaseId: string | null = null;
+    if (!body.create) {
+      const product = (await loadProducts(true)).find((p) => p.id === slug);
+      if (!product?.databaseId) throw Error("Product not found.");
+      databaseId = product.databaseId;
+    }
+    const { data, error } = await adminDatabase().rpc("shop_save_product", {
+      p_id: databaseId, p_expected: body.revision,
+      p_fields: { slug, name, description, note, category: body.category,
+        price: body.price, stock: body.stock, packedWeightGrams: body.packedWeightGrams ?? null, active: body.active === true,
+        details: body.details, colors: body.colors },
+      p_images: body.gallery,
     });
-    return Response.json({ saved: true });
-  } catch (e) {
-    return errorResponse(e);
-  }
+    if (error) throw error;
+    return Response.json({ saved: true, id: data });
+  } catch (error) { return errorResponse(error); }
 }

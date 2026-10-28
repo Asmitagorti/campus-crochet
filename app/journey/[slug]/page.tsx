@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { loadJournal } from "@/lib/content";
+import { loadJournal } from "@/lib/store-data";
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,

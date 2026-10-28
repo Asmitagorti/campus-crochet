@@ -1,54 +1,15 @@
 import Link from "next/link";
-export const metadata = { title: "Privacy & your details | Campus-Crochet" };
-export default function Privacy() {
-  return (
-    <main className="page-wrap policy-page">
-      <span className="eyebrow">Care extends to your details, too</span>
-      <h1>A little privacy promise ♡</h1>
-      <section>
-        <h2>What we ask for</h2>
-        <p>
-          For an order, we ask for your name, email, phone number, campus pickup
-          details and any note you choose to share. A contact message includes
-          your name, email, topic and message.
-        </p>
-      </section>
-      <section>
-        <h2>What we use it for</h2>
-        <p>
-          We use these details to answer your questions, arrange your order and
-          pickup, and resolve order issues. Order and message records are stored
-          in the studio's website database. We do not add you to a marketing
-          list.
-        </p>
-      </section>
-      <section>
-        <h2>Payments</h2>
-        <p>
-          Payments are handled by Razorpay. Card numbers, UPI credentials and
-          other payment credentials are entered in Razorpay's checkout and are
-          not stored in our database. We keep order references, payment
-          references, amounts and payment status.
-        </p>
-      </section>
-      <section>
-        <h2>On your device</h2>
-        <p>
-          Your bag, favourite products and chosen theme are saved in your
-          browser. Clearing your browser's website storage removes them. A
-          pending payment reference may be stored in your browser session so you
-          can verify a payment if interrupted.
-        </p>
-      </section>
-      <section>
-        <h2>Questions or deletion requests</h2>
-        <p>
-          Contact the studio on <a href="tel:+917674971144">+91 76749 71144</a>{" "}
-          or through our <Link href="/contact">contact page</Link> to ask about
-          your details. Records needed to fulfil an order or meet applicable
-          record-keeping requirements may need to be retained.
-        </p>
-      </section>
-    </main>
-  );
+
+export const metadata = { title: "Privacy policy | Campus Crochet" };
+
+export default function PrivacyPage() {
+  return <main className="page-wrap policy-page">
+    <span className="eyebrow">Your details</span>
+    <h1>Privacy policy ♡</h1>
+    <section><h2>Information we collect</h2><p>When you sign in and order, we receive your registered email, account identifier, name, mobile number, selected delivery location, any complete delivery address you enter, cart and favorites, order items, amounts, payment references and fulfillment status. If you contact us, we also receive the details in your message. We do not ask for card numbers or UPI credentials on this site.</p></section>
+    <section><h2>Why we need it</h2><p>We use this information to identify your account, show your own cart and orders, process and track purchases, arrange fulfillment, send order confirmation and completion emails, and respond to support requests. The site does not use order information to send marketing messages.</p></section>
+    <section><h2>Services involved</h2><p>Supabase handles account sign-in and stores site records, customer records and product images. Razorpay processes payments and provides payment status; payment credentials are entered in its checkout. Resend sends the two order lifecycle emails. Messages sent to <a href="mailto:support@campus-crochet.tech">support@campus-crochet.tech</a> are handled in Zoho Mail. Each provider receives the information needed for its role.</p></section>
+    <section><h2>On your device and in our records</h2><p>Your browser keeps the sign-in session and theme preference. The saved cart and favorites are linked to your account. A pending payment reference may remain in your browser session for recovery. Signing out clears personal information from the current view. Order and support records may be retained where needed to fulfill orders, resolve issues and meet applicable record-keeping obligations.</p></section>
+    <section><h2>Questions and privacy concerns</h2><p>Email <a href="mailto:support@campus-crochet.tech">support@campus-crochet.tech</a> to ask about your information or raise a privacy concern. Include enough detail to identify the relevant account or order. You can also visit our <Link href="/contact">contact page</Link>.</p></section>
+  </main>;
 }

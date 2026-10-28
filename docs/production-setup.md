@@ -1,54 +1,34 @@
 # Production setup
 
-## Firebase
+## Supabase
 
-1. Enable **Google** as the sign-in provider in Firebase Authentication. Add `localhost` for local testing and the real production hostname to authorised domains. Other providers are not accepted by the server.
-2. Publish the exact contents of `firestore.rules` in the Firebase Console under Firestore → Rules, or use the Firebase CLI with the project selected. The rules have been tested locally; they have not been published automatically.
-3. Configure the TTL field for `request_limits.expiresAt` using `firestore.indexes.json` or the Google Cloud Console. TTL is housekeeping; request enforcement also checks the expiry time directly.
-4. Production credentials: use `FIREBASE_PROJECT_ID` and secret-managed `FIREBASE_ADMIN_JSON`, or Application Default Credentials on Google Cloud. Do not deploy the Downloads service-account file or commit it.
-5. Set `ADMIN_EMAIL` to the designated administrator address and sign in with that verified Google account. The server binds one UID to `admin_config/singleton`, creates the customer/admin profile and sets the custom role claim. There is no need to edit role fields in the browser. The admin link appears only in that account; `/studio` also checks authorisation on every data operation.
+1. Run [`supabase/migrations/20261027_campus_storefront.sql`](../supabase/migrations/20261027_campus_storefront.sql) once in the project's SQL Editor. This migration is additive to existing data. It revokes old browser write access and confines the checkout and email functions to the server service role. Do **not** run the earlier pasted development policies granting open writes.
+2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and server-only `SUPABASE_SERVICE_ROLE_KEY` in the deployment environment. Never use the service role key in browser code.
+3. Create a Google OAuth web client and enable Google in Supabase Auth → Providers with its client ID and secret. Use the Supabase callback URL shown in that provider's settings. Configure the site URL and allowed `/account` redirect URLs for local and production. Once Google works, disable the Email provider in Supabase Auth. The app only offers Google and server APIs reject email-link sessions. See [Supabase Google setup](https://supabase.com/docs/guides/auth/social-sign-in/auth-google) and [redirect URL guide](https://supabase.com/docs/guides/auth/redirect-urls).
+4. Run [`supabase/migrations/20261027_designated_admin.sql`](../supabase/migrations/20261027_designated_admin.sql) in the SQL Editor. Admin access is fixed to the verified Google account `asmileis4evr@gmail.com`; `ADMIN_EMAIL` does not control it. Signing in creates or updates its `users` profile with the admin role. All admin routes verify the Supabase session, this exact email, and the role on the server. The SQL applies the same identity and OAuth-session checks to the existing Supabase Storage admin policy.
+5. Run [`supabase/migrations/20261027_admin_password.sql`](../supabase/migrations/20261027_admin_password.sql). Set `ADMIN_PORTAL_SESSION_SECRET` to a private random 64-character hex value in the deployment environment; the local ignored `.env.local` already contains one. The first Google sign-in by the designated admin shows a password setup form. Choose a unique passphrase of at least 16 characters. Later admin visits require this password, and every admin API checks the short-lived unlock cookie bound to that Google session. The database migration blocks direct browser writes to the product image bucket so uploads cannot bypass the password step. If the password is lost, the project owner can remove the singleton row from `admin_portal_credentials` in the SQL Editor and set a new password after Google sign-in.
+6. Run `npm run seed:supabase` to add missing catalogue/content rows without resetting stock. Product images are stored in the public `product_images` Storage bucket.
 
-## Razorpay
+Firebase has only test data and is not migrated. Existing test rows already in Supabase are left in place by the migration. Review or remove them in the dashboard before admitting real customers.
 
-The integration uses the Orders API on the server, integer paise amounts and currency `INR`. The browser receives only the public key and provider order ID. Payment verification validates the server-stored order ID, HMAC signature, provider payment amount/currency and captured status before confirming the order.
+## Product images
 
-1. Keep test keys for testing. Replace `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` with live keys only for the production environment; never prefix the secret with `NEXT_PUBLIC_`.
-2. Set `SITE_ORIGIN` to the exact HTTPS production origin.
-3. Run a successful and failed payment smoke test, verify the matching order in the studio, then verify pickup/fulfilment handling.
-4. Do not mix test and live orders in one Firestore project for a real launch. Use a separate production project/database or archive/remove test records after review and before accepting live customers.
+The 15 storefront images are copied from `public/images` to the existing public Supabase Storage `product_images` bucket by `scripts/migrate-images-to-supabase.mjs`. The script verifies each public image against its local original before switching live URLs. It leaves the old Cloudinary objects untouched. Admin uploads now go to the same Supabase bucket through a server route that requires admin access. No Cloudinary account or credentials are needed by the running site.
 
-## Scheduled reconciliation
+## Razorpay and delivery
 
-Stock is reserved transactionally before a payment order is created. The browser releases unpaid reservations after a verified cancellation. To handle closed tabs or a missing callback, schedule `/api/cron/reconcile` with your hosting scheduler with `Authorization: Bearer CRON_SECRET`. The handler checks Razorpay before releasing expired reservations and confirms captured/authorised payments. `vercel.json` uses one daily invocation at 00:00 UTC, compatible with Vercel Hobby. This is around 05:30 IST, with Vercel Hobby timing flexibility. Abandoned reservations may therefore remain held until the next daily cleanup. Successful browser verification and verified browser cancellations update orders immediately. If a browser closes before verification completes, payment status is recovered by reconciliation. If faster cleanup is needed, use a hosting plan that supports more frequent jobs or an independently configured authenticated scheduler. Without this job, abandoned reservations remain held until reconciled; this avoids silently selling stock committed to an unresolved payment.
+Set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and the exact production `SITE_ORIGIN`. Test with Razorpay test keys first. The server reserves stock and creates the order in a transaction, checks the expected server price, and only marks it paid after signature and provider amount/currency/capture checks. The profile displays tracking stages; the admin changes them through `/admin`.
 
-Do not configure Firestore TTL on payment reservations: releasing stock must be a transaction after checking payment state, not a raw document deletion.
+Run [`supabase/migrations/20261027_delivery_pricing.sql`](../supabase/migrations/20261027_delivery_pricing.sql) after the other migrations. Aditya Surampalem checkout has no added delivery charge. For “Others,” the server quotes an enabled destination PIN and the smallest weight slab covering the combined packed weight, using India Post Parcel Retail from Kakinada HO 533001. The combined delivery charge is the verified full payable postage including tax plus ₹15. The database recalculates and saves it before Razorpay starts. The customer sees the final total before payment; a changed amount requires a fresh quote. Orders with an unsupported PIN, missing packed product weight, or missing weight slab cannot be paid. In `/admin`, enter each product’s measured packed weight and add only rates checked in [India Post’s calculator](https://www.indiapost.gov.in/calculate-postage); this migration enables no destination by default. The checkout quote is final for the customer, so the shop absorbs any difference at the post office. Review the order, cancellation and return policy copy before launch; business terms need your approval.
 
-## Cloudinary
+## Resend and scheduled jobs
 
-Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and secret-managed `CLOUDINARY_API_SECRET`. Only the single admin can use the upload endpoint. Image type and size are checked, and product image URLs must belong to this Cloudinary cloud. No unsigned public upload preset is required. The existing images have already been uploaded.
+Verify a sending domain in Resend, then set server-only `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (for example a verified address on the Campus Crochet domain). The app sends no sign-in email. It queues a confirmation only after captured payment, and a completion email only on the first transition to completed. It does not send intermediate status or owner notification emails. Order emails use stable event keys and Resend's idempotency header. Failed sends do not roll back paid orders; the admin dashboard remains the source of order truth.
 
-## Remaining launch checks
+The [current Resend Free plan](https://resend.com/pricing) lists 3,000 emails per month and 100 per day. Two order emails mean up to roughly 1,500 completed orders per month or 50 per day if no other email uses that account. The Pro listing is 50,000 per month with no daily email limit. Check your actual plan in Resend before launch; a usage estimate is not a delivery guarantee.
 
-- Confirm the proposed INR prices, exact product measurements and material descriptions in the studio.
-- Sign in with the designated Google account to finish the admin binding and exercise the authenticated studio and checkout in the real browser.
-- Publish the supplied Firestore rules, set production secrets, and activate reconciliation.
-- Check the pages on real mobile and desktop browsers. Automated browser visual verification was blocked by the local preview's browser access policy during implementation.
-- Review store policies and customer-facing fulfilment details for your launch.
+Set `CRON_SECRET` and schedule `GET /api/cron/reconcile` with `Authorization: Bearer <CRON_SECRET>`. It reconciles payment callbacks and dispatches queued order emails. `vercel.json` currently runs daily; more frequent delivery requires a supported scheduler. A missed/ambiguous email remains visible in the `notification_jobs` table for manual review after retry safeguards. Keep the cron endpoint private.
 
-The application is built and connected locally. No production site deployment, live payment or automatic rules publication has been performed.
+## Launch verification
 
-### Browser security configuration
-
-`next.config.ts` applies MIME-sniffing and framing protection, referrer and permissions policies, popup-compatible COOP, production-only one-year HSTS, and private/no-store API responses. Framework identification and production browser source maps are disabled. HSTS intentionally omits preload and includeSubDomains so deploying this app does not commit other subdomains to HTTPS.
-
-`proxy.ts` issues a fresh CSP script nonce for each page request and forwards the policy to Next's renderer. Checkout forwards the nonce to the Razorpay script. Production permits neither inline scripts without a nonce nor eval. Inline styles remain permitted for Motion and checkout styling. Cloudinary images, Google authentication and Razorpay have explicit resource allowances. HTTPS upgrades are production-only; local development retains hot reload support. Keep the root layout dynamically rendered when using nonces.
-
-Run `node scripts/check-security-headers.mjs` against a production server on port 3003 (or set `TEST_ORIGIN`) to verify response headers, unique nonces, script nonce coverage, and API caching. An interactive Google sign-in and Razorpay test checkout remain required before launch; HTTP tests cannot verify third-party popup behavior.
-
-The project targets Node.js 24.x on Vercel. A scoped dependency override keeps `jwks-rsa` on CommonJS-compatible `jose` 5.10.0: its current synchronous `require('jose')` otherwise fails on hosts that disable `require(ESM)`. Keep the lockfile in deployments and run `npm run check:firebase-runtime` when updating Firebase authentication dependencies.
-
-### Firebase credential value
-
-The ignored `.env.local` now contains the complete service-account object in `FIREBASE_ADMIN_JSON`, encoded as single-line JSON. The application no longer reads a local JSON file path.
-
-For a hosting dashboard, copy only the JSON value into the server-side `FIREBASE_ADMIN_JSON` environment variable; omit the surrounding dotenv single quotes. Keep the private key's JSON `\n` escapes intact. Do not use a `NEXT_PUBLIC_` prefix. Restart or redeploy after changing production environment variables.
+Run `npm run typecheck`, `npm run build`, and `node --test --import tsx tests/*.test.ts`. In a browser, test Google sign-in and account isolation after sign-out, a Razorpay test payment and recovery, dashboard tracking, admin authorization, one completion email, Supabase Storage upload, all footer/policy links, and a mobile viewport. Verify the Resend sender and review provider logs. No real charge or customer email should be used for the smoke test.

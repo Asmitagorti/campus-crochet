@@ -4,25 +4,38 @@ import Link from "next/link";
 import { useAuth } from "./auth-provider";
 import { LogOut, ArrowRight, ShoppingBag, LockKeyhole } from "lucide-react";
 import { money } from "@/lib/catalog";
+import { orderProgress } from "@/lib/order-progress";
 type AccountOrder = {
   id: string;
   amount: number;
+  subtotalPaise: number;
+  deliveryPaise: number;
   status: string;
+  paymentStatus: string;
+  fulfillment: string | null;
   created_at: string;
-  items: { name: string; quantity: number }[];
+  items: { name: string; quantity: number; price: number }[];
+  customer?: { addressChoice: string | null; deliveryAddress: string | null; deliveryPin: string | null };
 };
 export default function Account() {
   const { user, ready, admin, error, login, logout, token } = useAuth(),
     [orders, setOrders] = useState<AccountOrder[]>([]),
+    [ordersOwner, setOrdersOwner] = useState<string | null>(null),
     [loadError, setLoadError] = useState(""),
     [loading, setLoading] = useState(true);
   useEffect(() => {
     if (!user) {
+      setOrders([]);
+      setOrdersOwner(null);
+      setLoadError("");
       setLoading(false);
       return;
     }
     let active = true;
-    token()
+    setOrders([]);
+    setOrdersOwner(null);
+    setLoading(true);
+    const load = () => token()
       .then((t) =>
         fetch("/api/account/orders", {
           headers: { Authorization: `Bearer ${t}` },
@@ -31,7 +44,7 @@ export default function Account() {
       .then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw Error(d.error);
-        if (active) setOrders(d.orders);
+        if (active) { setOrders(d.orders); setOrdersOwner(user.uid); setLoadError(""); }
       })
       .catch(() => {
         if (active)
@@ -40,8 +53,13 @@ export default function Account() {
       .finally(() => {
         if (active) setLoading(false);
       });
+    void load();
+    const timer = setInterval(() => void load(), 30000);
+    window.addEventListener("focus", load);
     return () => {
       active = false;
+      clearInterval(timer);
+      window.removeEventListener("focus", load);
     };
   }, [user, token]);
   return (
@@ -67,8 +85,7 @@ export default function Account() {
           <LockKeyhole />
           <h2>Make yourself at home.</h2>
           <p>
-            Use your Google account to checkout and see your orders. No new
-            password to remember.
+            Choose your Google account to see your orders and favourites.
           </p>
           <button className="google-button" onClick={() => void login()}>
             <span>G</span> Continue with Google
@@ -78,9 +95,6 @@ export default function Account() {
               {error}
             </p>
           )}
-          <p className="quiet-note">
-            Your sign-in is securely handled by Google and Firebase.
-          </p>
           <Link className="text-link" href="/shop">
             A little browsing first <ArrowRight size={14} />
           </Link>
@@ -91,14 +105,15 @@ export default function Account() {
             <p>{user.email}</p>
             <div>
               <Link href="/shop?saved=1">Your favourites ♡</Link>
-              {admin && <Link href="/studio">Open studio →</Link>}
-              <button onClick={() => void logout()}>
+              {admin && <Link href="/admin">Open admin dashboard →</Link>}
+              <button className="account-signout" onClick={() => void logout()}>
                 <LogOut size={15} /> Sign out
               </button>
             </div>
           </div>
+          <p className="account-guidance">Check this page regularly for order progress. Keep your registered email accessible and enable notifications for the order confirmation and completion messages.</p>
           {error && <p className="form-error">{error}</p>}
-          {loading ? (
+          {loading || ordersOwner !== user.uid ? (
             <p className="loading-note">Finding your little orders…</p>
           ) : loadError ? (
             <p role="alert" className="form-error">
@@ -115,12 +130,13 @@ export default function Account() {
             </div>
           ) : (
             <div className="account-orders">
-              {orders.map((o) => (
-                <article className="order-history-card" key={o.id}>
+              {orders.map((o) => {
+                const progress = orderProgress(o.paymentStatus, o.fulfillment);
+                return <article className="order-history-card" key={o.id}>
                   <div>
                     <strong>{o.id}</strong>
                     <span className="status-pill">
-                      {o.status.replaceAll("_", " ")}
+                      {progress.label}
                     </span>
                   </div>
                   <p>
@@ -133,19 +149,20 @@ export default function Account() {
                   </p>
                   {o.items.map((i) => (
                     <p key={i.name}>
-                      {i.name} × {i.quantity}
+                      {i.name} × {i.quantity} · {money(i.price * i.quantity)}
                     </p>
                   ))}
-                  <strong>{money(o.amount / 100)}</strong>
-                  <a
-                    href={`https://wa.me/917674971144?text=${encodeURIComponent(`Hello, a question about my Campus-Crochet order ${o.id}.`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+                  {o.customer?.addressChoice && <p>Deliver to: {o.customer.addressChoice}{o.customer.deliveryAddress ? ` · ${o.customer.deliveryAddress}` : ""}{o.customer.deliveryPin ? ` · ${o.customer.deliveryPin}` : ""}</p>}
+                  <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery: {o.deliveryPaise ? money(o.deliveryPaise / 100) : "Included"}</p>
+                  <strong>Total: {money(o.amount / 100)}</strong>
+                  {o.paymentStatus === "paid" && <ol className="order-progress" aria-label={`Order ${o.id} progress`}>
+                    {["Confirmed", "Preparing", "Completed"].map((stage, index) => <li key={stage} className={progress.step >= index + 1 ? "done" : ""} aria-current={progress.step === index + 1 ? "step" : undefined}>{stage}</li>)}
+                  </ol>}
+                  <a href={`mailto:support@campus-crochet.tech?subject=${encodeURIComponent(`Order ${o.id}`)}`}>
                     Ask about this order →
                   </a>
-                </article>
-              ))}
+                </article>;
+              })}
             </div>
           )}
         </>
