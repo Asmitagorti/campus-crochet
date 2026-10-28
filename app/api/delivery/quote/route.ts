@@ -4,12 +4,14 @@ import { resolveCheckoutItems } from "@/lib/checkout-items";
 import { quoteDelivery } from "@/lib/delivery-quote";
 import { guard, errorResponse } from "@/lib/forms";
 import { readJsonBody } from "@/lib/request-body";
+import { requireShoppingMode } from "@/lib/site-mode";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
     await guard(request, 30);
+    await requireShoppingMode();
     await requireUser(request);
     const body = await readJsonBody(request);
     const pin = typeof body.deliveryPin === "string" ? body.deliveryPin.trim() : "";

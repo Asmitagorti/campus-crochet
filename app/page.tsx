@@ -25,7 +25,7 @@ const reveal = {
 };
 export default function Home() {
   const router = useRouter();
-  const { liked, toggleLike, add, catalog: products, settings } = useShop();
+  const { liked, toggleLike, add, catalog: products, settings, mode } = useShop();
   const [query, setQuery] = useState(""),
     [category, setCategory] = useState("All"),
     [onlyLiked, setOnlyLiked] = useState(false);
@@ -41,6 +41,26 @@ export default function Home() {
       name === "All" ? "/shop" : `/shop?category=${encodeURIComponent(name)}`,
     );
   }
+  if (mode === "poll") return <main id="home" className="poll-home">
+    <section className="hero">
+      <div className="hero-photo" style={{ backgroundImage: `url("${settings.heroImage}")` }} role="img" aria-label="Warm crochet craft studio" />
+      <div className="hero-product"><img src={media("/images/stitch.jpg")} alt="Handmade crochet plush" /><span>made with a little love ♡</span></div>
+      <img className="hero-blooms" src={media("/images/tulips-clean.png")} alt="" aria-hidden="true" />
+      <div className="hero-paper"><span className="eyebrow">You choose what comes next ♡</span>
+        <h1>Help me pick the next little things to make ♡</h1>
+        <p>Explore the designs and choose as many favourites as you like. Your votes will help shape the next collection.</p>
+        <button className="stitch-button" onClick={() => router.push("/vote")}>Explore the designs <ArrowRight size={17} /></button>
+        <p className="quiet-note">No orders or payments are taken while the poll is showing.</p>
+      </div>
+    </section>
+    <section className="section-wrap poll-home-intro"><Title sub="Your favourites help decide what I make next.">A collection shaped by you</Title>
+      <p>Pick several designs you love. Continue with Google when you are ready to save your choices, then come back to see how the voting is going.</p>
+      <button className="stitch-button" onClick={() => router.push("/vote")}>Vote for your favourites <Heart size={16} /></button>
+    </section>
+    <section className="story"><div className="story-photo"><img src={media("/images/stitch.jpg")} alt="An original handmade crochet piece" loading="lazy" /></div>
+      <div className="story-copy"><span className="eyebrow">A little story</span><h2>Every stitch starts with an idea.</h2><p>This time, you get to help choose which ideas become real crochet pieces.</p></div>
+    </section>
+  </main>;
   return (
     <main id="home">
       <section className="hero">

@@ -1,6 +1,8 @@
 import { loadProducts, loadSettings } from "@/lib/store-data";
 import AuthProvider from "@/components/auth-provider";
 import SiteShell from "@/components/site-shell";
+import AnalyticsTracker from "@/components/analytics-tracker";
+import { loadDisplayMode } from "@/lib/site-mode";
 import type { Metadata } from "next";
 import "@fontsource/caveat/500.css";
 import "@fontsource/caveat/600.css";
@@ -19,17 +21,20 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [initialProducts, initialSettings] = await Promise.all([
+  const [initialProducts, initialSettings, initialMode] = await Promise.all([
     loadProducts(),
     loadSettings(),
+    loadDisplayMode(),
   ]);
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
         <AuthProvider>
+          <AnalyticsTracker />
           <SiteShell
             initialProducts={initialProducts}
             initialSettings={initialSettings}
+            initialMode={initialMode}
           >
             {children}
           </SiteShell>

@@ -33,7 +33,9 @@ export async function POST(request: Request) {
       (file.type === "image/webp" && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") ||
       (file.type === "image/avif" && bytes.toString("ascii", 4, 8) === "ftyp");
     if (!valid) throw Error("This file does not look like a supported image.");
-    const path = `admin/${randomUUID()}.${file.type === "image/jpeg" ? "jpg" : file.type.slice(6)}`;
+    const purpose = form.get("purpose");
+    if (purpose !== null && purpose !== "poll") throw Error("Invalid photo destination.");
+    const path = `${purpose === "poll" ? "poll" : "admin"}/${randomUUID()}.${file.type === "image/jpeg" ? "jpg" : file.type.slice(6)}`;
     const bucket = adminDatabase().storage.from("product_images");
     const { error } = await bucket.upload(path, bytes, {
       contentType: file.type, cacheControl: "31536000", upsert: false,

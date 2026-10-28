@@ -20,19 +20,32 @@ export async function GET(request: Request) {
   try {
     await requireAdminAccess(request);
     const db = adminDatabase();
-    const [products, settings, orders, messages, journey, settingRow, deliveryRates] = await Promise.all([
+    const [products, settings, orders, messages, journey, settingRow, deliveryRates, runtimeState, pollRows] = await Promise.all([
       loadProducts(true), loadSettings(),
       allRows("orders", "order_id,receipt_number,total_price,subtotal_paise,postage_paise,delivery_paise,delivery_pin,payment_status,order_status,ordered_at,version,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))", "ordered_at"),
       allRows("support_tickets", "id,name,email,subject,message,status,created_at", "created_at"),
       db.from("journey").select("slug,data,published,revision").order("updated_at", { ascending: false }),
       db.from("site_content").select("revision").eq("key", "settings").maybeSingle(),
       db.from("delivery_rates").select("destination_pin,max_weight_grams,postage_paise,active,verified_at").order("destination_pin").order("max_weight_grams"),
+      db.from("site_runtime").select("mode,active_poll_id").eq("id", true).single(),
+      db.from("poll_rounds").select("id,title,description,status,created_at,opened_at,closed_at,poll_options(id,title,description,image_url,position)")
+        .order("created_at", { ascending: false }).limit(30),
     ]);
     if (journey.error) throw journey.error;
     if (settingRow.error) throw settingRow.error;
     if (deliveryRates.error) throw deliveryRates.error;
+    if (runtimeState.error) throw runtimeState.error;
+    if (pollRows.error) throw pollRows.error;
+    const polls = await Promise.all((pollRows.data || []).map(async (round) => {
+      const { data: result, error } = await db.rpc("poll_results", { p_round: round.id });
+      if (error) throw error;
+      return { ...round, results: result };
+    }));
     return Response.json({
       products,
+      siteMode: runtimeState.data.mode,
+      activePollId: runtimeState.data.active_poll_id,
+      polls,
       deliveryRates: deliveryRates.data || [],
       orders: orders.map((row) => {
         const customer = row.customer_snapshot && typeof row.customer_snapshot === "object" ? row.customer_snapshot as Record<string, unknown> : {};

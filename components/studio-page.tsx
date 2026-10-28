@@ -6,6 +6,8 @@ import { Product, categories, money } from "@/lib/catalog";
 import { JournalEntry } from "@/lib/journal";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
 import { orderProgress } from "@/lib/order-progress";
+import StudioPolls, { type AdminPoll } from "./studio-polls";
+import StudioAnalytics from "./studio-analytics";
 import {
   Plus,
   Upload,
@@ -19,6 +21,7 @@ import {
   BookOpen,
   Settings,
   Check,
+  Heart,
 } from "lucide-react";
 type AdminProduct = Product & { active: boolean; revision: number };
 type StudioOrder = {
@@ -57,6 +60,9 @@ type Message = {
 type Chapter = JournalEntry & { published: boolean; revision: number };
 type StudioData = {
   products: AdminProduct[];
+  siteMode: "shop" | "poll";
+  activePollId: string | null;
+  polls: AdminPoll[];
   deliveryRates: DeliveryRate[];
   orders: StudioOrder[];
   messages: Message[];
@@ -314,6 +320,8 @@ export default function Studio() {
       <nav className="studio-tabs" aria-label="Studio sections">
         {[
           { id: "products", Icon: Package },
+          { id: "polls", Icon: Heart },
+          { id: "analytics", Icon: Heart },
           { id: "delivery", Icon: Package },
           { id: "orders", Icon: ShoppingBag },
           { id: "messages", Icon: MessageCircle },
@@ -661,6 +669,9 @@ export default function Studio() {
           {!data?.deliveryRates.length && <p>No delivery rates are enabled yet. Add a verified destination to offer “Others” checkout.</p>}
         </section>
       )}
+      {tab === "polls" && data && <StudioPolls mode={data.siteMode} activePollId={data.activePollId}
+        polls={data.polls} token={token} onSaved={load} />}
+      {tab === "analytics" && <StudioAnalytics token={token} />}
       {tab === "orders" && (
         <section>
           <h2>Little things, on their way</h2>

@@ -9,11 +9,13 @@ import { gateway, razorpayKeys } from "@/lib/razorpay";
 import { guard, text, errorResponse } from "@/lib/forms";
 import { parseCheckoutCustomer } from "@/lib/checkout-validation";
 import { readJsonBody } from "@/lib/request-body";
+import { requireShoppingMode } from "@/lib/site-mode";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     await guard(request);
+    await requireShoppingMode();
     const user = await requireUser(request);
     const body = await readJsonBody(request);
     if (body.website) throw Error("Unable to process request.");

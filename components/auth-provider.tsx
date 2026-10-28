@@ -9,7 +9,7 @@ type AuthState = {
   ready: boolean;
   admin: boolean;
   error: string;
-  login: (destination?: "/admin") => Promise<void>;
+  login: (destination?: "/admin" | "/vote") => Promise<void>;
   logout: () => Promise<void>;
   token: () => Promise<string>;
 };
@@ -48,6 +48,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
               sessionStorage.removeItem("campus-after-google");
               if (destination === "/admin" && data.admin === true && window.location.pathname === "/account")
                 window.location.replace("/admin");
+              if (destination === "/vote" && window.location.pathname === "/account")
+                window.location.replace("/vote");
             }
           }
           else {
@@ -69,9 +71,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     void db.auth.getSession().then(({ data }) => sync(data.session?.user || null, data.session?.access_token));
     return () => { subscription.unsubscribe(); generation.current++; };
   }, [sync]);
-  async function login(destination?: "/admin") {
+  async function login(destination?: "/admin" | "/vote") {
     setError("");
-    if (destination === "/admin") sessionStorage.setItem("campus-after-google", "/admin");
+    if (destination === "/admin" || destination === "/vote") sessionStorage.setItem("campus-after-google", destination);
     else sessionStorage.removeItem("campus-after-google");
     const { error: authError } = await browserDatabase().auth.signInWithOAuth({
       provider: "google",

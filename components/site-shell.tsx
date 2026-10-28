@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { products, getProduct, photo, money, maxQuantity } from "@/lib/catalog";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
+import type { SiteMode } from "@/lib/site-mode";
 import { Yarn } from "./design";
 type ShopState = {
   cart: Record<string, number>;
@@ -36,6 +37,7 @@ type ShopState = {
   settings: SiteSettings;
   catalog: typeof products;
   stocks: Record<string, number>;
+  mode: SiteMode;
 };
 const ShopContext = createContext<ShopState | null>(null);
 export function useShop() {
@@ -54,15 +56,18 @@ export default function SiteShell({
   children,
   initialProducts,
   initialSettings,
+  initialMode,
 }: {
   children: React.ReactNode;
   initialProducts: typeof products;
   initialSettings: SiteSettings;
+  initialMode: SiteMode;
 }) {
   const { user, ready: authReady, logout, token } = useAuth();
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [preferencesOwner, setPreferencesOwner] = useState<string | null>(null);
   const [settings, setSettings] = useState(initialSettings);
+  const [mode, setMode] = useState<SiteMode>(initialMode);
   const [catalog, setCatalog] = useState(initialProducts);
   const pathname = usePathname(),
     router = useRouter();
@@ -158,6 +163,18 @@ export default function SiteShell({
     localStorage.setItem("campus-theme", dark ? "dark" : "light");
   }, [dark]);
   useEffect(() => {
+    const changed = (event: Event) => {
+      const next = (event as CustomEvent).detail;
+      if (next === "shop" || next === "poll") setMode(next);
+    };
+    window.addEventListener("campus-mode-changed", changed);
+    return () => window.removeEventListener("campus-mode-changed", changed);
+  }, []);
+  useEffect(() => {
+    if (mode === "poll" && (pathname === "/shop" || pathname === "/checkout" || pathname.startsWith("/products/")))
+      router.replace("/vote");
+  }, [mode, pathname, router]);
+  useEffect(() => {
     setMenu(false);
     setBag(false);
     let active = true;
@@ -175,6 +192,10 @@ export default function SiteShell({
         .then((data) => {
           if (active && data && !data.error) setSettings(data);
         })
+        .catch(() => {});
+      fetch("/api/mode", { cache: "no-store" })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => { if (active && (data?.mode === "shop" || data?.mode === "poll")) setMode(data.mode); })
         .catch(() => {});
     };
     sync();
@@ -278,6 +299,7 @@ export default function SiteShell({
         stocks,
         catalog,
         settings,
+        mode,
       }}
     >
       <MotionConfig reducedMotion="user">
@@ -298,7 +320,7 @@ export default function SiteShell({
               {links.map(([name, href]) => (
                 <Link
                   key={href}
-                  href={href}
+                  href={mode === "poll" && href === "/shop" ? "/vote" : href}
                   aria-current={
                     (
                       href === "/"
@@ -310,7 +332,7 @@ export default function SiteShell({
                   }
                   onClick={() => setMenu(false)}
                 >
-                  {name}
+                  {mode === "poll" && name === "Shop" ? "Vote" : name}
                 </Link>
               ))}
               {user && (
@@ -327,7 +349,7 @@ export default function SiteShell({
               )}
             </nav>
             <div className="header-actions">
-              <form className="search" action="/shop">
+              {mode === "shop" && <form className="search" action="/shop">
                 <input
                   name="q"
                   aria-label="Search handmade products"
@@ -336,7 +358,7 @@ export default function SiteShell({
                 <button aria-label="Search">
                   <Search size={16} />
                 </button>
-              </form>
+              </form>}
               <button
                 className="icon-button theme"
                 aria-label={
@@ -346,13 +368,13 @@ export default function SiteShell({
               >
                 {dark ? <Sun /> : <Moon />}
               </button>
-              <Link
+              {mode === "shop" && <Link
                 className="icon-button"
                 href="/shop?saved=1"
                 aria-label="Show favourites"
               >
                 <Heart />
-              </Link>
+              </Link>}
               <Link
                 className="icon-button account-link"
                 href="/account"
@@ -360,14 +382,14 @@ export default function SiteShell({
               >
                 <UserRound />
               </Link>
-              <button
+              {mode === "shop" && <button
                 className="icon-button bag-button"
                 aria-label={`Open bag, ${count} items`}
                 onClick={() => setBag(true)}
               >
                 <ShoppingBag />
                 <span>{count}</span>
-              </button>
+              </button>}
               <button
                 className="icon-button mobile-menu"
                 aria-label="Toggle navigation"
@@ -431,7 +453,7 @@ export default function SiteShell({
               {notice}
             </div>
           )}
-          {bag && (
+          {mode === "shop" && bag && (
             <>
               <div className="modal-backdrop" onClick={() => setBag(false)} />
               <aside

@@ -1,11 +1,15 @@
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import Checkout from "@/components/checkout-page";
+import { redirect } from "next/navigation";
+import { loadDisplayMode } from "@/lib/site-mode";
 export const metadata = {
   title: "A little closer to yours | Campus-Crochet",
   robots: { index: false, follow: false },
 };
+export const dynamic = "force-dynamic";
 export default async function CheckoutPage() {
+  if (await loadDisplayMode() === "poll") redirect("/vote");
   const nonce = (await headers()).get("x-nonce") || undefined;
   return (
     <Suspense

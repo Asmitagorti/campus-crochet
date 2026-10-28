@@ -15,6 +15,14 @@ Firebase has only test data and is not migrated. Existing test rows already in S
 
 The 15 storefront images are copied from `public/images` to the existing public Supabase Storage `product_images` bucket by `scripts/migrate-images-to-supabase.mjs`. The script verifies each public image against its local original before switching live URLs. It leaves the old Cloudinary objects untouched. Admin uploads now go to the same Supabase bucket through a server route that requires admin access. No Cloudinary account or credentials are needed by the running site.
 
+## Poll mode and visitor statistics
+
+The complete selling site is preserved in local Git commit `c8e3554` on branch `codex/full-storefront-snapshot-2026-10-28`. The current code supports both modes in one deployment. Run [`supabase/migrations/20261028_poll_mode.sql`](../supabase/migrations/20261028_poll_mode.sql) after the storefront and delivery migrations. It creates poll and visitor-statistics tables and starts with **poll mode on, checkout off**, showing a coming-soon page until a round is opened. Keep the deployment's existing Supabase environment settings; analytics uses the server-only service-role key to sign its first-party browser cookie. `ANALYTICS_COOKIE_SECRET` may be set to a separate random secret if desired.
+
+At `/admin`, open **Polls**, create a draft, upload at least two design photos, review their names, then choose **Open poll · hide checkout**. The photos go into `product_images/poll/` and do not change the sellable catalogue. Visitors may choose several designs; one Google account has one editable ballot per round. Public vote totals update regularly. Use **Show shop · enable checkout** to sell, **Resume poll** to reopen voting, or **Close round** to finish it. Closing leaves the site on the no-payment poll holding page; switch to shop explicitly when ready to sell. New order inserts are blocked in both the API and database while poll mode is on. Earlier pending payments can still finish verification.
+
+The **Analytics** admin tab shows approximate distinct browsers and active-tab minutes by hour, day and week in India Standard Time. It stores a signed random browser ID and thirty-second activity samples, without an account ID or IP address in analytics records. The privacy page explains the measurement and lets visitors opt out and remove their activity. Records older than 180 days are removed during activity writes. These are estimates, not a precise count of people.
+
 ## Razorpay and delivery
 
 Set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and the exact production `SITE_ORIGIN`. Test with Razorpay test keys first. The server reserves stock and creates the order in a transaction, checks the expected server price, and only marks it paid after signature and provider amount/currency/capture checks. The profile displays tracking stages; the admin changes them through `/admin`.
@@ -32,3 +40,5 @@ Set `CRON_SECRET` and schedule `GET /api/cron/reconcile` with `Authorization: Be
 ## Launch verification
 
 Run `npm run typecheck`, `npm run build`, and `node --test --import tsx tests/*.test.ts`. In a browser, test Google sign-in and account isolation after sign-out, a Razorpay test payment and recovery, dashboard tracking, admin authorization, one completion email, Supabase Storage upload, all footer/policy links, and a mobile viewport. Verify the Resend sender and review provider logs. No real charge or customer email should be used for the smoke test.
+
+For the poll launch, also test a draft upload, multiple selections and a changed ballot with two different Google accounts, public vote totals, a paused poll, a resumed poll, and the shop/payment gate in both modes. Leave the site in poll mode until you are ready to accept payments.

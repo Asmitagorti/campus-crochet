@@ -5,6 +5,7 @@ import { useAuth } from "./auth-provider";
 import { LogOut, ArrowRight, ShoppingBag, LockKeyhole } from "lucide-react";
 import { money } from "@/lib/catalog";
 import { orderProgress } from "@/lib/order-progress";
+import { useShop } from "./site-shell";
 type AccountOrder = {
   id: string;
   amount: number;
@@ -18,6 +19,7 @@ type AccountOrder = {
   customer?: { addressChoice: string | null; deliveryAddress: string | null; deliveryPin: string | null };
 };
 export default function Account() {
+  const { mode } = useShop();
   const { user, ready, admin, error, login, logout, token } = useAuth(),
     [orders, setOrders] = useState<AccountOrder[]>([]),
     [ordersOwner, setOrdersOwner] = useState<string | null>(null),
@@ -74,8 +76,8 @@ export default function Account() {
         </h1>
         <p>
           {user
-            ? "Your orders, your favourites, and the things you love."
-            : "Sign in with Google to keep your orders close."}
+            ? mode === "poll" ? "See your past orders and help choose the next collection." : "Your orders, your favourites, and the things you love."
+            : mode === "poll" ? "Sign in with Google to vote for your favourites." : "Sign in with Google to keep your orders close."}
         </p>
       </section>
       {!ready ? (
@@ -85,7 +87,7 @@ export default function Account() {
           <LockKeyhole />
           <h2>Make yourself at home.</h2>
           <p>
-            Choose your Google account to see your orders and favourites.
+            {mode === "poll" ? "Choose your Google account to save your design votes." : "Choose your Google account to see your orders and favourites."}
           </p>
           <button className="google-button" onClick={() => void login()}>
             <span>G</span> Continue with Google
@@ -95,8 +97,8 @@ export default function Account() {
               {error}
             </p>
           )}
-          <Link className="text-link" href="/shop">
-            A little browsing first <ArrowRight size={14} />
+          <Link className="text-link" href={mode === "poll" ? "/vote" : "/shop"}>
+            {mode === "poll" ? "Browse the designs" : "A little browsing first"} <ArrowRight size={14} />
           </Link>
         </div>
       ) : (
@@ -104,7 +106,7 @@ export default function Account() {
           <div className="account-toolbar">
             <p>{user.email}</p>
             <div>
-              <Link href="/shop?saved=1">Your favourites ♡</Link>
+              {mode === "shop" && <Link href="/shop?saved=1">Your favourites ♡</Link>}
               {admin && <Link href="/admin">Open admin dashboard →</Link>}
               <button className="account-signout" onClick={() => void logout()}>
                 <LogOut size={15} /> Sign out
@@ -123,9 +125,9 @@ export default function Account() {
             <div className="empty-state">
               <ShoppingBag />
               <h2>Your story starts with a little thing.</h2>
-              <p>Your orders will appear here after checkout.</p>
-              <Link className="stitch-button" href="/shop">
-                Find your first favourite <ArrowRight size={15} />
+              <p>{mode === "poll" ? "The shop is resting while you help choose the next designs." : "Your orders will appear here after checkout."}</p>
+              <Link className="stitch-button" href={mode === "poll" ? "/vote" : "/shop"}>
+                {mode === "poll" ? "Vote for designs" : "Find your first favourite"} <ArrowRight size={15} />
               </Link>
             </div>
           ) : (
