@@ -6,12 +6,12 @@ export function proxy(request: NextRequest) {
   const policy = [
     "default-src 'self'",
     // Next's streaming scripts and dynamically loaded SDK scripts inherit trust.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com https://*.razorpay.com https://apis.google.com https://www.gstatic.com${development ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com https://*.razorpay.com https://apis.google.com https://www.gstatic.com https://www.googletagmanager.com${development ? " 'unsafe-eval'" : ""}`,
     // Motion and Razorpay use inline style attributes for layout and animation.
     "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' data: blob: ${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mmojefxcwayyrxkpenlf.supabase.co"} https://*.googleusercontent.com https://*.razorpay.com`,
+    `img-src 'self' data: blob: ${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mmojefxcwayyrxkpenlf.supabase.co"} https://*.googleusercontent.com https://*.razorpay.com https://*.google-analytics.com`,
     "font-src 'self'",
-    `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mmojefxcwayyrxkpenlf.supabase.co"} https://*.razorpay.com${development ? " ws: wss:" : ""}`,
+    `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mmojefxcwayyrxkpenlf.supabase.co"} https://*.razorpay.com https://*.google-analytics.com${development ? " ws: wss:" : ""}`,
     "frame-src https://accounts.google.com https://*.razorpay.com",
     "object-src 'none'",
     "base-uri 'self'",

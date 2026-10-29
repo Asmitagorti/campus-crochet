@@ -2,6 +2,8 @@ import { loadProducts, loadSettings } from "@/lib/store-data";
 import AuthProvider from "@/components/auth-provider";
 import SiteShell from "@/components/site-shell";
 import AnalyticsTracker from "@/components/analytics-tracker";
+import GoogleAnalytics from "@/components/google-analytics";
+import { googleAnalyticsMeasurementId } from "@/lib/google-analytics";
 import { loadDisplayMode } from "@/lib/site-mode";
 import type { Metadata } from "next";
 import "@fontsource/caveat/500.css";
@@ -31,6 +33,7 @@ export default async function RootLayout({
       <body>
         <AuthProvider>
           <AnalyticsTracker />
+          <GoogleAnalytics measurementId={googleAnalyticsMeasurementId} />
           <SiteShell
             initialProducts={initialProducts}
             initialSettings={initialSettings}
