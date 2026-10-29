@@ -57,7 +57,7 @@ export default function Home() {
       <p>Pick several designs you love. Continue with Google when you are ready to save your choices, then come back to see how the voting is going.</p>
       <button className="stitch-button" onClick={() => router.push("/vote")}>Vote for your favourites <Heart size={16} /></button>
     </section>
-    <section className="story"><div className="story-photo"><img src={media("/images/stitch.jpg")} alt="An original handmade crochet piece" loading="lazy" /></div>
+    <section className="story poll-story" style={{ backgroundImage: `linear-gradient(90deg, rgba(255, 249, 235, .82), rgba(255, 249, 235, .88)), url("${settings.storyBackgroundImage}")` }}><div className="story-photo"><img src={settings.storyImage} alt="Handmade crochet piece" loading="lazy" /></div>
       <div className="story-copy"><span className="eyebrow">A little story</span><h2>Every stitch starts with an idea.</h2><p>This time, you get to help choose which ideas become real crochet pieces.</p></div>
     </section>
   </main>;

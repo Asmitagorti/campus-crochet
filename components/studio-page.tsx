@@ -24,6 +24,11 @@ import {
   Heart,
 } from "lucide-react";
 type AdminProduct = Product & { active: boolean; revision: number };
+const siteImages: { key: "heroImage" | "storyBackgroundImage" | "storyImage"; label: string; help: string }[] = [
+  { key: "heroImage", label: "Main hero image", help: "The large picture at the top of the page." },
+  { key: "storyBackgroundImage", label: "Story background", help: "The soft photo behind ‘A little story’ in poll mode." },
+  { key: "storyImage", label: "Story photo", help: "The picture in the tilted frame beside the story." },
+];
 type StudioOrder = {
   mode?: string;
   id: string;
@@ -967,7 +972,7 @@ export default function Studio() {
           }}
         >
           <h2>The little details of your site</h2>
-          {(Object.keys(defaultSettings) as (keyof SiteSettings)[]).map((k) => (
+          {(Object.keys(defaultSettings) as (keyof SiteSettings)[]).filter((k) => !siteImages.some((image) => image.key === k)).map((k) => (
             <div className="field" key={k}>
               <label htmlFor={`settings-${k}`}>
                 {k.replace(/([A-Z])/g, " $1")}
@@ -999,22 +1004,31 @@ export default function Studio() {
               )}
             </div>
           ))}
-          <label className="outline-button">
-            <Upload size={15} /> Upload hero image
-            <input
-              type="file"
-              hidden
-              accept="image/*"
-              disabled={busy}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file)
-                  void upload(file, (url) =>
-                    setSettings((v) => ({ ...v, heroImage: url })),
-                  );
-              }}
-            />
-          </label>
+          <div className="site-image-grid">
+            {siteImages.map(({ key, label, help }) => (
+              <div className="site-image-field" key={key}>
+                <img src={settings[key]} alt={`${label} preview`} />
+                <h3>{label}</h3>
+                <p>{help}</p>
+                <label className="outline-button">
+                  <Upload size={15} /> Choose picture
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/jpeg,image/png,image/webp,image/avif"
+                    disabled={busy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file)
+                        void upload(file, (url) =>
+                          setSettings((v) => ({ ...v, [key]: url })),
+                        );
+                    }}
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
           <button className="stitch-button" disabled={busy}>
             <Save size={16} /> Save site content
           </button>

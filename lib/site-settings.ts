@@ -1,10 +1,14 @@
+import { media } from "./media";
+
 export const defaultSettings = {
   brand: "campus-Crochet",
   announcement: "Handmade on campus, just for you.",
   heroTitle: "Tiny stitches,\nBig smiles",
   heroDescription:
     "Adorable crochet keepsakes, made by hand, for real moments. Real yarn. Real character. Just pure, handmade cuteness.",
-  heroImage: "/images/hero.png",
+  heroImage: media("/images/hero.png"),
+  storyBackgroundImage: media("/images/round-coasters.jpg"),
+  storyImage: media("/images/bag.jpg"),
   aboutIntro:
     "Mine did. When I was seven, I loved making Rainbow Loom bracelets for friends and family. I asked my mum for a bigger hook. She accidentally ordered a crochet hook instead.",
   contactIntro:

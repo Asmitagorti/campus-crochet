@@ -34,7 +34,8 @@ export async function POST(request: Request) {
       const data: Record<string, string> = {};
       for (const key of Object.keys(defaultSettings))
         data[key] = text(body[key], key === "aboutIntro" || key === "contactIntro" ? 5000 : 1500);
-      if (!validImage(data.heroImage)) throw Error("Choose a Supabase hero image.");
+      if (!validImage(data.heroImage) || !validImage(data.storyBackgroundImage) || !validImage(data.storyImage))
+        throw Error("Choose images uploaded to Supabase Storage for the site pictures.");
       const { data: result, error } = await db.rpc("shop_save_content", {
         p_key: "settings", p_expected: body.revision, p_data: data, p_published: true,
       });

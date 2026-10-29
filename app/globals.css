@@ -662,6 +662,10 @@ nav a:hover {
     0 97%
   );
 }
+.poll-story {
+  background-position: center;
+  background-size: cover;
+}
 .story-photo {
   position: relative;
   transform: rotate(-7deg);
