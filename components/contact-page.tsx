@@ -21,7 +21,8 @@ export default function Contact() {
   const params = useSearchParams(),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [reference, setReference] = useState("");
+    [reference, setReference] = useState(""),
+    [emailed, setEmailed] = useState(false);
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -41,6 +42,7 @@ export default function Contact() {
       if (!response.ok)
         throw Error(result.error || "Your message could not be sent.");
       setReference(result.id);
+      setEmailed(result.emailed === true);
       form.reset();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Please try again.");
@@ -86,7 +88,7 @@ export default function Contact() {
             <div className="form-success" role="status">
               <Check />
               <h2>Your hello is here ♡</h2>
-              <p>Your message has been saved for the studio.</p>
+              <p>{emailed ? "Your message has been emailed to support and saved for the studio." : "Your message was saved for the studio, but the email alert could not be sent. Please email support directly if you need a prompt reply."}</p>
               <span className="reference">{reference}</span>
               <p>Keep this reference for any follow-up.</p>
               <a className="stitch-button" href={`mailto:support@campus-crochet.tech?subject=${encodeURIComponent(`Support request ${reference}`)}`}>Email support <ArrowRight size={15} /></a>
@@ -98,7 +100,7 @@ export default function Contact() {
             <form onSubmit={submit}>
               <h2>Send a message</h2>
               <p className="form-intro">
-                This form saves your message for the studio dashboard. For an email conversation, write to <a href="mailto:support@campus-crochet.tech">support@campus-crochet.tech</a>.
+                This form emails your message to <a href="mailto:support@campus-crochet.tech">support@campus-crochet.tech</a> and saves a copy in the studio dashboard.
               </p>
               <div className="field">
                 <label htmlFor="name">

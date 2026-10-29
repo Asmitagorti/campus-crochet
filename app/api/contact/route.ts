@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { adminDatabase } from "@/lib/supabase-admin";
 import { guard, text, email, errorResponse } from "@/lib/forms";
 import { readJsonBody } from "@/lib/request-body";
+import { sendSupportEmail } from "@/lib/support-email";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
@@ -36,7 +37,18 @@ export async function POST(request: Request) {
     }).select("id").single();
     if (error) throw error;
     const id = data.id;
-    return Response.json({ id }, { status: 201 });
+    let emailed = false;
+    try {
+      await sendSupportEmail(
+        { id, name, email: address, subject: topic, message },
+        process.env.RESEND_API_KEY || "",
+        process.env.RESEND_FROM_EMAIL || "",
+      );
+      emailed = true;
+    } catch (notifyError) {
+      console.error("Support note email failed", id, notifyError);
+    }
+    return Response.json({ id, emailed }, { status: 201 });
   } catch (e) {
     return errorResponse(e);
   }

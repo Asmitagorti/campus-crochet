@@ -1,7 +1,8 @@
 import "server-only";
 import { adminDatabase } from "./supabase-admin";
+import { pollImageUrls } from "./poll-domain";
 
-export type PollOption = { id: string; title: string; description: string; imageUrl: string; position: number };
+export type PollOption = { id: string; title: string; description: string; imageUrl: string; imageUrls: string[]; position: number };
 export type PollPublic = { id: string; title: string; description: string; openedAt: string | null; options: PollOption[] };
 export type PollResult = { totalVoters: number; options: { id: string; votes: number }[] };
 
@@ -27,7 +28,8 @@ export async function loadActivePoll(): Promise<PollPublic | null> {
   return { id: round.id, title: round.title, description: round.description,
     openedAt: round.opened_at,
     options: (options || []).filter((option) => !option.hidden_at).map((option) => ({ id: option.id, title: option.title,
-      description: option.description, imageUrl: option.image_url, position: option.position })) };
+      description: option.description, imageUrl: option.image_url,
+      imageUrls: pollImageUrls(option.image_url, option.image_urls), position: option.position })) };
 }
 
 export async function loadPollResults(roundId: string): Promise<PollResult> {

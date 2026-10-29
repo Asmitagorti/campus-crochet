@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseSiteMode, assertShoppingEnabled, parseBallotOptionIds, publicPollResults, withdrawnVoteCount, visibleDraftSelections } from "../lib/poll-domain";
+import { parseSiteMode, assertShoppingEnabled, parseBallotOptionIds, publicPollResults, withdrawnVoteCount, visibleDraftSelections, pollImageUrls, movePollImage } from "../lib/poll-domain";
 
 test("unknown mode never permits a new purchase", () => {
   assert.equal(parseSiteMode("shop"), "shop");
@@ -28,4 +28,20 @@ test("hidden poll items stay in recorded ballots but disappear from public total
   });
   assert.equal(withdrawnVoteCount([visible, hidden], [visible]), 1);
   assert.deepEqual(visibleDraftSelections([visible, hidden], [visible]), [visible]);
+});
+
+test("older poll items still show their original picture", () => {
+  const original = "https://example.supabase.co/storage/v1/object/public/product_images/poll/original.jpg";
+  const extra = "https://example.supabase.co/storage/v1/object/public/product_images/poll/extra.jpg";
+  assert.deepEqual(pollImageUrls(original, null), [original]);
+  assert.deepEqual(pollImageUrls(original, []), [original]);
+  assert.deepEqual(pollImageUrls(original, [original, extra]), [original, extra]);
+});
+
+test("moving a poll picture changes its saved display order without changing the original list", () => {
+  const pictures = ["cover", "blue", "pink"];
+  assert.deepEqual(movePollImage(pictures, 2, 0), ["pink", "cover", "blue"]);
+  assert.deepEqual(pictures, ["cover", "blue", "pink"]);
+  assert.deepEqual(movePollImage(pictures, 0, -1), pictures);
+  assert.deepEqual(movePollImage(pictures, 2, 3), pictures);
 });

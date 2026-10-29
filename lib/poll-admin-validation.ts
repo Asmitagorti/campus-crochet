@@ -1,5 +1,16 @@
 import { validImage } from "./image-url";
 
+export function parsePollImageUrls(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 8)
+    throw Error("Choose between one and eight item pictures.");
+  if (!value.every((url) => typeof url === "string" && validImage(url)
+    && new URL(url).pathname.startsWith("/storage/v1/object/public/product_images/poll/")))
+    throw Error("Upload an item picture for this poll.");
+  if (new Set(value).size !== value.length)
+    throw Error("Choose different pictures for this item.");
+  return value;
+}
+
 export function parsePollRoundDraft(body: Record<string, unknown>) {
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
@@ -12,12 +23,12 @@ export function parsePollOptionDraft(body: Record<string, unknown>) {
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
   const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
+  const imageUrls = parsePollImageUrls(body.imageUrls === undefined ? [imageUrl] : body.imageUrls);
   const position = body.position;
   if (title.length < 2 || title.length > 100) throw Error("Enter a design name of 2–100 characters.");
   if (description.length > 500) throw Error("Keep the design note under 500 characters.");
-  if (!validImage(imageUrl) || !new URL(imageUrl).pathname.startsWith("/storage/v1/object/public/product_images/poll/"))
-    throw Error("Upload an item picture for this poll.");
+  if (imageUrls[0] !== imageUrl) throw Error("The first picture must be the item picture.");
   if (!Number.isInteger(position) || (position as number) < 0 || (position as number) > 1000)
     throw Error("Enter a valid display order.");
-  return { title, description, imageUrl, position: position as number };
+  return { title, description, imageUrl, imageUrls, position: position as number };
 }

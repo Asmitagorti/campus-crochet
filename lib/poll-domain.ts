@@ -31,3 +31,16 @@ export function visibleDraftSelections(selected: string[], visibleIds: string[])
   const visible = new Set(visibleIds);
   return selected.filter((id) => visible.has(id));
 }
+
+export function pollImageUrls(primary: string, gallery: unknown): string[] {
+  return Array.isArray(gallery) && gallery.length > 0 && gallery.every((url) => typeof url === "string")
+    ? gallery : [primary];
+}
+
+export function movePollImage<T>(images: T[], from: number, to: number): T[] {
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 ||
+    from >= images.length || to >= images.length || from === to) return images;
+  const reordered = [...images];
+  reordered.splice(to, 0, reordered.splice(from, 1)[0]);
+  return reordered;
+}
