@@ -13,3 +13,21 @@ export function parseBallotOptionIds(value: unknown): string[] {
   if (new Set(value).size !== value.length) throw Error("Choose each design only once.");
   return value;
 }
+
+export function publicPollResults<T extends { totalVoters: number; options: { id: string; votes: number }[] }>(
+  results: T,
+  visibleIds: string[],
+): T {
+  const visible = new Set(visibleIds);
+  return { ...results, options: results.options.filter((option) => visible.has(option.id)) };
+}
+
+export function withdrawnVoteCount(selected: string[], visibleIds: string[]): number {
+  const visible = new Set(visibleIds);
+  return selected.filter((id) => !visible.has(id)).length;
+}
+
+export function visibleDraftSelections(selected: string[], visibleIds: string[]): string[] {
+  const visible = new Set(visibleIds);
+  return selected.filter((id) => visible.has(id));
+}

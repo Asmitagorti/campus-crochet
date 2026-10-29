@@ -16,7 +16,7 @@ export function parsePollOptionDraft(body: Record<string, unknown>) {
   if (title.length < 2 || title.length > 100) throw Error("Enter a design name of 2–100 characters.");
   if (description.length > 500) throw Error("Keep the design note under 500 characters.");
   if (!validImage(imageUrl) || !new URL(imageUrl).pathname.startsWith("/storage/v1/object/public/product_images/poll/"))
-    throw Error("Upload a separate poll photo for this design.");
+    throw Error("Upload an item picture for this poll.");
   if (!Number.isInteger(position) || (position as number) < 0 || (position as number) > 1000)
     throw Error("Enter a valid display order.");
   return { title, description, imageUrl, position: position as number };

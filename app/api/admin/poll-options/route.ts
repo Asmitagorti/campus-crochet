@@ -14,6 +14,13 @@ export async function POST(request: Request) {
     const body = await readJsonBody(request);
     if (!isUuid(body.roundId)) throw Error("Choose a poll first.");
     const db = adminDatabase();
+    if ((body.action === "hide" || body.action === "restore") && isUuid(body.id)) {
+      const { error } = await db.rpc("poll_set_option_hidden", {
+        p_round: body.roundId, p_option: body.id, p_hidden: body.action === "hide",
+      });
+      if (error) throw error;
+      return Response.json({ saved: true });
+    }
     if (body.action === "delete" && isUuid(body.id)) {
       const { data, error } = await db.from("poll_options").delete()
         .eq("id", body.id).eq("round_id", body.roundId).select("id").maybeSingle();

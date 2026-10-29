@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       db.from("site_content").select("revision").eq("key", "settings").maybeSingle(),
       db.from("delivery_rates").select("destination_pin,max_weight_grams,postage_paise,active,verified_at").order("destination_pin").order("max_weight_grams"),
       db.from("site_runtime").select("mode,active_poll_id").eq("id", true).single(),
-      db.from("poll_rounds").select("id,title,description,status,created_at,opened_at,closed_at,poll_options(id,title,description,image_url,position)")
+      db.from("poll_rounds").select("id,title,description,status,created_at,opened_at,closed_at,poll_options(*)")
         .order("created_at", { ascending: false }).limit(30),
     ]);
     if (journey.error) throw journey.error;

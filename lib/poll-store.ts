@@ -5,6 +5,11 @@ export type PollOption = { id: string; title: string; description: string; image
 export type PollPublic = { id: string; title: string; description: string; openedAt: string | null; options: PollOption[] };
 export type PollResult = { totalVoters: number; options: { id: string; votes: number }[] };
 
+export async function requireFinalPollMigration(): Promise<void> {
+  const { error } = await adminDatabase().from("poll_options").select("hidden_at").limit(1);
+  if (error) throw Error("Run the final poll migration in Supabase before voting or opening a poll.");
+}
+
 export async function loadActivePoll(): Promise<PollPublic | null> {
   const db = adminDatabase();
   const { data: state, error: stateError } = await db.from("site_runtime")
@@ -13,7 +18,7 @@ export async function loadActivePoll(): Promise<PollPublic | null> {
   if (state.mode !== "poll" || !state.active_poll_id) return null;
   const [{ data: round, error: roundError }, { data: options, error: optionsError }] = await Promise.all([
     db.from("poll_rounds").select("id,title,description,opened_at,status").eq("id", state.active_poll_id).single(),
-    db.from("poll_options").select("id,title,description,image_url,position").eq("round_id", state.active_poll_id)
+    db.from("poll_options").select("*").eq("round_id", state.active_poll_id)
       .order("position").order("created_at"),
   ]);
   if (roundError) throw roundError;
@@ -21,7 +26,7 @@ export async function loadActivePoll(): Promise<PollPublic | null> {
   if (round.status !== "open") return null;
   return { id: round.id, title: round.title, description: round.description,
     openedAt: round.opened_at,
-    options: (options || []).map((option) => ({ id: option.id, title: option.title,
+    options: (options || []).filter((option) => !option.hidden_at).map((option) => ({ id: option.id, title: option.title,
       description: option.description, imageUrl: option.image_url, position: option.position })) };
 }
 

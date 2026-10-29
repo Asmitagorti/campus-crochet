@@ -2,6 +2,7 @@ import { adminDatabase } from "@/lib/supabase-admin";
 import { requireAdminAccess } from "@/lib/admin-access";
 import { guard, errorResponse } from "@/lib/forms";
 import { readJsonBody } from "@/lib/request-body";
+import { requireFinalPollMigration } from "@/lib/poll-store";
 
 export const runtime = "nodejs";
 const isUuid = (value: unknown) => typeof value === "string" && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(value);
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
     if (!["open", "shop", "hold", "pause", "resume", "close"].includes(String(body.action)))
       throw Error("Choose a valid poll action.");
     if (body.action === "open" && !isUuid(body.roundId)) throw Error("Choose a draft poll.");
+    if (body.action === "open") await requireFinalPollMigration();
     const { data, error } = await adminDatabase().rpc("poll_admin_transition", {
       p_action: body.action, p_round: isUuid(body.roundId) ? body.roundId : null,
     });

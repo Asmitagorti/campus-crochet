@@ -15,7 +15,7 @@ test("poll options accept only this project's separate poll uploads", () => {
     const imageUrl = "https://example.supabase.co/storage/v1/object/public/product_images/poll/photo.jpg";
     assert.deepEqual(parsePollOptionDraft({ title: "Little owl", description: "Blue yarn", imageUrl, position: 2 }),
       { title: "Little owl", description: "Blue yarn", imageUrl, position: 2 });
-    assert.throws(() => parsePollOptionDraft({ title: "Little owl", imageUrl: imageUrl.replace("/poll/", "/admin/"), position: 2 }), /poll photo/i);
+    assert.throws(() => parsePollOptionDraft({ title: "Little owl", imageUrl: imageUrl.replace("/poll/", "/admin/"), position: 2 }), /item picture/i);
   } finally {
     if (previous === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     else process.env.NEXT_PUBLIC_SUPABASE_URL = previous;

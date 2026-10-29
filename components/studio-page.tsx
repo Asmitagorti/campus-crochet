@@ -104,6 +104,7 @@ export default function Studio() {
     [editing, setEditing] = useState<AdminProduct | null>(null),
     [rate, setRate] = useState<{ pin: string; grams: string; rupees: string; active: boolean; existing: boolean }>({ pin: "", grams: "", rupees: "", active: true, existing: false }),
     [rateVerified, setRateVerified] = useState(false),
+    [rateEditorOpen, setRateEditorOpen] = useState(false),
     [isNew, setIsNew] = useState(false),
     [chapter, setChapter] = useState<Chapter | null>(null),
     [settings, setSettings] = useState<SiteSettings & { revision: number }>({
@@ -338,9 +339,7 @@ export default function Studio() {
             }}
           >
             <Icon size={16} />
-            {id === "settings"
-              ? "Site content"
-              : id[0].toUpperCase() + id.slice(1)}
+            {id === "settings" ? "Site content" : id === "delivery" ? "Delivery setup" : id[0].toUpperCase() + id.slice(1)}
           </button>
         ))}
       </nav>
@@ -643,28 +642,39 @@ export default function Studio() {
         ))}
       {tab === "delivery" && (
         <section>
-          <h2>Delivery rates</h2>
-          <p className="quiet-note">Origin: Kakinada HO 533001 · India Post Parcel Retail. Enter the full payable quote including tax from <a href="https://www.indiapost.gov.in/calculate-postage" target="_blank" rel="noreferrer">India Post’s calculator</a>. The customer pays this amount plus ₹15, shown as one delivery charge.</p>
-          <form className="paper-form studio-editor" onSubmit={(event) => {
+          <h2>Delivery outside Aditya</h2>
+          <div className="paper-form studio-editor">
+            <p>You do not need this while the design poll is open. For future orders outside Aditya, the customer enters an address and PIN. The site uses that PIN and the items’ packed weight to find a saved price here. It does not ask India Post for a live price.</p>
+            <ol>
+              <li>Enter each product’s <strong>packed weight</strong> in Products, including packaging.</li>
+              <li>Check the full India Post Parcel Retail price from Kakinada <strong>533001</strong> to the destination PIN at that weight in <a href="https://www.indiapost.gov.in/calculate-postage" target="_blank" rel="noreferrer">India Post’s calculator</a>.</li>
+              <li>Save that quote below. Checkout adds exactly <strong>₹15</strong>. For example, an ₹80 quote becomes a ₹95 delivery charge.</li>
+            </ol>
+            <p className="quiet-note">Only PINs and parcel weights with an enabled saved rate can pay online.</p>
+          </div>
+          <details className="paper-form studio-editor" open={rateEditorOpen} onToggle={(event) => setRateEditorOpen(event.currentTarget.open)}>
+            <summary>{rate.existing ? "Edit saved rate" : "Add a verified delivery rate"}</summary>
+          <form onSubmit={(event) => {
             event.preventDefault();
             if (!/^\d+(\.\d{1,2})?$/.test(rate.rupees)) { setError("Enter the exact quoted rupees and paise."); return; }
             void save("/api/admin/delivery-rates", {
               destinationPin: rate.pin, maxWeightGrams: Number(rate.grams),
               postagePaise: Math.round(Number(rate.rupees) * 100), active: rate.active, verified: rateVerified,
-            }).then((ok) => { if (ok) { setRate({ pin: "", grams: "", rupees: "", active: true, existing: false }); setRateVerified(false); } });
+            }).then((ok) => { if (ok) { setRate({ pin: "", grams: "", rupees: "", active: true, existing: false }); setRateVerified(false); setRateEditorOpen(false); } });
           }}>
             <div className="form-columns">
-              <div className="field"><label htmlFor="rate-pin">Destination PIN</label><input id="rate-pin" inputMode="numeric" pattern="[1-9][0-9]{5}" maxLength={6} required disabled={rate.existing} value={rate.pin} onChange={(event) => setRate({ ...rate, pin: event.target.value })} /></div>
-              <div className="field"><label htmlFor="rate-grams">Weight slab up to (grams)</label><input id="rate-grams" type="number" min={1} max={50000} step={1} required disabled={rate.existing} value={rate.grams} onChange={(event) => setRate({ ...rate, grams: event.target.value })} /></div>
-              <div className="field"><label htmlFor="rate-price">India Post payable quote (₹, including tax)</label><input id="rate-price" type="number" min={0.01} max={10000} step={0.01} required value={rate.rupees} onChange={(event) => setRate({ ...rate, rupees: event.target.value })} /></div>
+              <div className="field"><label htmlFor="rate-pin">Customer’s destination PIN</label><input id="rate-pin" inputMode="numeric" pattern="[1-9][0-9]{5}" maxLength={6} required disabled={rate.existing} value={rate.pin} onChange={(event) => setRate({ ...rate, pin: event.target.value })} /><small>The six-digit PIN the customer will type at checkout.</small></div>
+              <div className="field"><label htmlFor="rate-grams">Covers packed orders up to (grams)</label><input id="rate-grams" type="number" min={1} max={50000} step={1} required disabled={rate.existing} value={rate.grams} onChange={(event) => setRate({ ...rate, grams: event.target.value })} /><small>For example, 500 covers parcels weighing 500 g or less.</small></div>
+              <div className="field"><label htmlFor="rate-price">Full India Post quote (₹, including tax)</label><input id="rate-price" type="number" min={0.01} max={10000} step={0.01} required value={rate.rupees} onChange={(event) => setRate({ ...rate, rupees: event.target.value })} /><small>Copy the final amount shown by India Post. We add ₹15 for the customer.</small></div>
             </div>
             <label className="consent"><input type="checkbox" checked={rate.active} onChange={(event) => setRate({ ...rate, active: event.target.checked })} /> Enable this PIN and weight slab</label>
             <label className="consent"><input type="checkbox" checked={rateVerified} onChange={(event) => setRateVerified(event.target.checked)} required={rate.active} /> I checked the full payable quote from 533001 in India Post’s calculator.</label>
             <button className="stitch-button" disabled={busy}>{busy ? "Saving…" : "Save delivery rate"}</button>
           </form>
+          </details>
           {data?.deliveryRates.map((entry) => <article className="studio-record editor-top" key={`${entry.destination_pin}/${entry.max_weight_grams}`}>
             <div><h3>{entry.destination_pin} · up to {entry.max_weight_grams} g</h3><p>India Post {money(entry.postage_paise / 100)} · Customer delivery {money((entry.postage_paise + 1500) / 100)} · {entry.active ? "Enabled" : "Disabled"}</p></div>
-            <button className="outline-button" type="button" onClick={() => { setRate({ pin: entry.destination_pin, grams: String(entry.max_weight_grams), rupees: (entry.postage_paise / 100).toFixed(2), active: entry.active, existing: true }); setRateVerified(false); }}>Edit</button>
+            <button className="outline-button" type="button" onClick={() => { setRate({ pin: entry.destination_pin, grams: String(entry.max_weight_grams), rupees: (entry.postage_paise / 100).toFixed(2), active: entry.active, existing: true }); setRateVerified(false); setRateEditorOpen(true); }}>Edit</button>
           </article>)}
           {!data?.deliveryRates.length && <p>No delivery rates are enabled yet. Add a verified destination to offer “Others” checkout.</p>}
         </section>

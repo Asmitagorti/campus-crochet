@@ -12,14 +12,16 @@ export async function POST(request: Request) {
     await requireAdminAccess(request);
     await guard(request, 40);
     const body = await readJsonBody(request);
-    const fields = parsePollRoundDraft(body);
     const db = adminDatabase();
     if (body.action === "create") {
-      const { data, error } = await db.from("poll_rounds").insert(fields).select("id").single();
+      const { data, error } = await db.from("poll_rounds").insert({
+        title: "What should I make next?", description: "",
+      }).select("id").single();
       if (error) throw error;
       return Response.json({ saved: true, id: data.id });
     }
     if (body.action === "update" && isUuid(body.id)) {
+      const fields = parsePollRoundDraft(body);
       const { data, error } = await db.from("poll_rounds").update(fields)
         .eq("id", body.id).eq("status", "draft").select("id").maybeSingle();
       if (error) throw error;
