@@ -1,49 +1,36 @@
-# Campus-Crochet
+# Campus Crochet
 
-A dynamic Next.js App Router storefront with TypeScript, Tailwind CSS 4, Motion, Firebase Google authentication, Firestore, Cloudinary images and Razorpay checkout in INR.
+Campus Crochet is a handmade crochet shop built with Next.js. This `main` branch contains the earlier Firebase storefront. The **poll-only site** is on [`codex/poll-mode`](https://github.com/Asmitagorti/campus-crochet/tree/codex/poll-mode); use that branch and its README when preparing the poll release. The poll code has not been merged into `main`.
 
-## Run
+## What is in `main`
 
-Use Node.js 24 or a supported Node.js LTS runtime. Copy `.env.example` to `.env.local` and configure server credentials. Then run:
+The storefront uses Firebase Google sign-in and Firestore for accounts, products, orders and site content. Product images are hosted on Cloudinary. Razorpay handles INR checkout. The private `/studio` area manages products, stock, orders, messages and published content.
+
+| Page | Purpose |
+| --- | --- |
+| `/shop` and `/products/[slug]` | Browse products, photos, prices and availability. |
+| `/account` | Sign in with Google and view saved items and orders. |
+| `/checkout` | Place an order and pay through Razorpay. |
+| `/about`, `/journey` and `/contact` | Read about the studio and send an enquiry. |
+| `/studio` | Manage the shop as the designated administrator. |
+
+## Run locally
+
+Use Node.js 24. Copy `.env.example` to `.env.local` and fill in the required credentials. Keep `.env.local` private.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-`npm run build` creates the production build; `npm start` runs it. No credentials are committed. Firebase Admin credentials are loaded from `FIREBASE_ADMIN_JSON` in the ignored environment file. Set the same server-only variable in production, or use Google Application Default Credentials. No local service-account file path is required.
+`npm run build` creates a production build; `npm start` serves it. `npm run bootstrap` adds missing starter products and content without resetting existing stock. Run it only after configuring the intended Firebase project.
 
-## Pages and functionality
+## Check this branch
 
-- `/shop`: live Firestore catalogue, collection filtering, search, sorting, stock filter and saved favourites.
-- `/products/[slug]`: individual product photos, INR price, availability, quantity, buy-now checkout, description, specifications and care.
-- `/about`, `/contact`, `/journey`, `/journey/[slug]`: studio story, persisted enquiries, WhatsApp/call links and editable published chapters.
-- `/account`: Google sign-in, order history and favourites. New users are customers by default.
-- `/checkout`: server-priced INR checkout with Razorpay, stock reservations and payment recovery.
-- `/studio`: private administrator workspace for product creation/editing, Cloudinary uploads, stock, publishing, order fulfilment, messages, Journey and site content.
-- `/privacy`: data and payment handling information.
+```sh
+npm run check:firebase-runtime
+npm run typecheck
+npm run build
+```
 
-Theme and bag persist locally. Signed-in favourites persist in Firestore. Storefront content is server-rendered from Firestore; the client refreshes stock/content on navigation, focus and at 30-second intervals. Shared design retains the original parchment, cocoa, blush and lavender theme; category and product grids use two columns on small screens.
-
-## Data and setup
-
-`npm run bootstrap` inserts only missing products, initial stock of 25 per product, the three Journey entries and site content. It never resets existing stock. Initial catalogue prices are proposed launch prices and are editable in the studio.
-
-All 15 current site photos are hosted on Cloudinary; the manifest is in `lib/media-map.json`. Originals remain in the repository. Admin uploads are server-authorised and sent to Cloudinary using server-only credentials.
-
-The single administrator is bound to the verified Google address configured as `ADMIN_EMAIL`. The first sign-in creates `admin_config/singleton` transactionally and adds the Admin SDK custom claim. Both the claim and singleton UID must match for admin access. Changing a browser profile or a role field cannot grant administrator rights. No public admin signup endpoint exists.
-
-See `docs/production-setup.md`, `docs/security-and-transactions.md` and `firestore.rules` before launch.
-
-## Verification
-
-- `npm run check:firebase-runtime` checks Firebase Auth imports and JWKS signature verification without Node's optional CommonJS-to-ESM loading support.
-- `npm run typecheck`
-- `npm run build`
-- `node scripts/check-http.mjs` against a running local server
-- `npm run check:transactions` uses isolated temporary Firestore fixtures and an unpaid Razorpay test order. No payment is made; fixture records are cleaned up.
-- `npx --yes --package firebase-tools firebase emulators:exec --only firestore --project demo-campus-crochet --config firebase.test.json "node --import tsx scripts/check-rules-emulator.ts"` runs 15 security rule cases without touching production rules.
-
-## Launch scope
-
-Campus pickup is the only fulfilment option, with no delivery charge. Automatic outbound email/WhatsApp notifications and carrier shipping are not connected. Messages are visible in the studio. Use test Razorpay keys during review, then switch to live keys, set the production origin, deploy Firestore rules and run the production payment smoke test.
+See [production setup](docs/production-setup.md) for Firebase rules, provider credentials, Razorpay testing and launch checks. This branch is **not** the poll release and should not be deployed as the poll site.
