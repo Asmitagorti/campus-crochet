@@ -29,8 +29,8 @@ export const money = (value: number) =>
     currency: "INR",
     maximumFractionDigits: 2,
   }).format(value);
-// Launch prices proposed for review. Stock count confirmed by the owner.
-const base = { stock: 25, madeToOrder: false };
+// Every piece is made after an order is placed.
+const base = { stock: null, madeToOrder: true };
 export const products: Product[] = [
   {
     ...base,
@@ -222,17 +222,6 @@ export const categories = [
   { name: "Gift Sets", image: "flowers" },
 ];
 export const getProduct = (id: string) => products.find((p) => p.id === id);
-export const availability = (p: Product) =>
-  p.stock !== null && p.stock > 0
-    ? "In stock"
-    : p.madeToOrder
-      ? "Made to order"
-      : "Out of stock";
-export const canOrder = (p: Product) =>
-  p.madeToOrder || (p.stock !== null && p.stock > 0);
-export const maxQuantity = (p: Product) =>
-  p.stock !== null && p.stock > 0
-    ? Math.min(10, p.stock)
-    : p.madeToOrder
-      ? 10
-      : 0;
+export const availability = (_p: Product) => "Made to order";
+export const canOrder = (p: Product) => p.active !== false;
+export const maxQuantity = (_p: Product) => 10;

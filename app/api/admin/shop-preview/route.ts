@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const items = entries.map(([slug, quantity]) => {
       const product = products.find((item) => item.id === slug && item.active);
       if (!product || !Number.isInteger(quantity) || (quantity as number) < 1 ||
-        (quantity as number) > 20 || (product.stock ?? 0) < (quantity as number))
+        (quantity as number) > 10)
         throw Error("Check the items in your preview bag.");
       return { price: product.price, quantity: quantity as number };
     });

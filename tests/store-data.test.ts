@@ -11,7 +11,8 @@ test("Supabase product rows keep the existing storefront shape", () => {
     product_images: [{ image_url: "second", display_order: 1 }, { image_url: "first", display_order: 0 }],
   });
   assert.equal(result.id, "bunny");
-  assert.equal(result.stock, 4);
+  assert.equal(result.stock, null);
+  assert.equal(result.madeToOrder, true);
   assert.equal(result.packedWeightGrams, 180);
   assert.deepEqual(result.gallery, ["first", "second"]);
   assert.deepEqual(result.colors, ["#f7efdf"]);

@@ -27,15 +27,13 @@ import { useShop } from "./site-shell";
 import { ProductCard } from "./product-card";
 import { Title } from "./design";
 export default function ProductDetail({ product: p }: { product: Product }) {
-  const { add, liked, toggleLike, stocks, catalog: products } = useShop(),
+  const { add, liked, toggleLike, catalog: products } = useShop(),
     router = useRouter();
   const [quantity, setQuantity] = useState(1),
     [image, setImage] = useState(0),
     [tab, setTab] = useState("The little details"),
     [zoom, setZoom] = useState(false);
-  const stock = stocks[p.id] ?? p.stock ?? 0,
-    max = Math.min(maxQuantity(p), stock),
-    available = stock > 0;
+  const max = maxQuantity(p);
   const related = products
     .filter((x) => x.id !== p.id)
     .sort(
@@ -112,11 +110,9 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           <div className="detail-price">
             {money(p.price)} <span>INR</span>
           </div>
-          <div className={`stock-label ${available ? "" : "sold-out"}`}>
+          <div className="stock-label">
             <span />
-            {available
-              ? `${stock} in stock · Ready for a new home`
-              : "Out of stock · Ask about the next batch"}
+            Made to order · Crocheted after you order
           </div>
           <p className="purchase-intro">{p.description}</p>
           <div className="colour-info">
@@ -153,7 +149,6 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             </div>
             <button
               className="stitch-button"
-              disabled={!available}
               onClick={() => add(p.id, Math.min(quantity, max))}
             >
               <ShoppingBag size={17} /> Add to bag
@@ -171,7 +166,6 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           </div>
           <button
             className="buy-button"
-            disabled={!available}
             onClick={() =>
               router.push(
                 `/checkout?buy=${p.id}&quantity=${Math.min(quantity, max)}`,
@@ -258,7 +252,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                   "Measurements",
                   "Contact us for exact measurements before purchasing",
                 ],
-                ["Availability", availability({ ...p, stock })],
+                ["Availability", availability(p)],
                 ["Delivery", "Aditya Surampalem free; home delivery ₹69, free above ₹499"],
               ].map(([key, value]) => (
                 <div key={key}>

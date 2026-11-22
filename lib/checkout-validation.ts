@@ -24,8 +24,10 @@ function addressField(body: Record<string, unknown>, key: string, label: string,
 export function parseCheckoutCustomer(body: Record<string, unknown>, registeredEmail: string | undefined): CheckoutCustomer {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (name.length < 2 || name.length > 80) throw Error("Please enter your full name.");
-  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
-  if (!/^[6-9]\d{9}$/.test(phone)) throw Error("Please enter a valid 10-digit Indian mobile number.");
+  const enteredPhone = typeof body.phone === "string" ? body.phone.trim().replace(/[ -]/g, "") : "";
+  const phone = enteredPhone.startsWith("+91") ? enteredPhone.slice(3) : enteredPhone;
+  if (!/^[6-9]\d{9}$/.test(phone) || (enteredPhone.startsWith("+") && !enteredPhone.startsWith("+91")))
+    throw Error("Please enter a valid Indian mobile number: 10 digits starting with 6–9, with optional +91.");
   if (!registeredEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registeredEmail))
     throw Error("Your registered email is unavailable. Please sign in again.");
   if (body.consent !== true) throw Error("Please agree to the order and privacy information.");

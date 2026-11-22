@@ -14,5 +14,6 @@ test("resolves a bag to trusted database products and quantity", () => {
 test("rejects duplicate or unavailable product lines before quoting", () => {
   assert.throws(() => resolveCheckoutItems([{ id: "bunny", quantity: 1 }, { id: "bunny", quantity: 1 }], [product]), /quantit/i);
   assert.throws(() => resolveCheckoutItems([{ id: "other", quantity: 1 }], [product]), /quantit/i);
-  assert.throws(() => resolveCheckoutItems([{ id: "bunny", quantity: 5 }], [product]), /quantit/i);
+  assert.equal(resolveCheckoutItems([{ id: "bunny", quantity: 5 }], [product])[0].quantity, 5);
+  assert.throws(() => resolveCheckoutItems([{ id: "bunny", quantity: 11 }], [product]), /quantit/i);
 });

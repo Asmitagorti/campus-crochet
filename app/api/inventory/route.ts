@@ -6,7 +6,6 @@ export async function GET() {
     return Response.json(
       {
         products,
-        stock: Object.fromEntries(products.map((p) => [p.id, p.stock])),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

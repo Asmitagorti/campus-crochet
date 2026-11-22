@@ -666,6 +666,19 @@ nav a:hover {
   background-position: center;
   background-size: cover;
 }
+.poll-story .story-copy {
+  padding: clamp(22px, 3vw, 38px);
+  border: 1px solid #d1b89d;
+  border-radius: 18px;
+  background: rgba(255, 248, 233, 0.96);
+  box-shadow: 0 8px 28px rgba(73, 43, 30, 0.18);
+  color: #3b2417;
+}
+.poll-story .story-copy .eyebrow,
+.poll-story .story-copy h2,
+.poll-story .story-copy p {
+  color: #3b2417;
+}
 .story-photo {
   position: relative;
   transform: rotate(-7deg);

@@ -11,12 +11,11 @@ import { Sprig } from "./design";
 export default function Shop() {
   const params = useSearchParams(),
     router = useRouter(),
-    { liked, stocks, catalog: products } = useShop();
+    { liked, catalog: products } = useShop();
   const q = params.get("q") || "",
     category = params.get("category") || "All",
     saved = params.get("saved") === "1";
-  const [sort, setSort] = useState("featured"),
-    [inStock, setInStock] = useState(false);
+  const [sort, setSort] = useState("featured");
   const categoryGroups = visibleCategoryGroups(products, categories.map((item) => item.name));
   function update(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
@@ -28,7 +27,6 @@ export default function Shop() {
     (p) =>
       (category === "All" || belongsToCategory(p, category)) &&
       (!saved || liked.includes(p.id)) &&
-      (!inStock || (stocks[p.id] ?? p.stock ?? 0) > 0) &&
       `${p.name} ${productCategoryNames(p).join(" ")} ${p.note}`
         .toLowerCase()
         .includes(q.toLowerCase()),
@@ -121,14 +119,6 @@ export default function Shop() {
               {list.length === 1 ? "treasure" : "treasures"}{" "}
               {saved ? "saved for you" : "to discover"}
             </span>
-            <label>
-              <input
-                type="checkbox"
-                checked={inStock}
-                onChange={(e) => setInStock(e.target.checked)}
-              />{" "}
-              In stock only
-            </label>
             {saved && (
               <button onClick={() => update("saved", "")}>
                 Show everything <X size={12} />
@@ -139,7 +129,7 @@ export default function Shop() {
             {list.map((p, i) => (
               <ProductCard
                 key={p.id}
-                product={{ ...p, stock: stocks[p.id] ?? p.stock }}
+                product={p}
                 index={i}
               />
             ))}

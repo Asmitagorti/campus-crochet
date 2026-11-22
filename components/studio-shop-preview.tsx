@@ -35,8 +35,8 @@ export default function StudioShopPreview({ products, settings, journey, email, 
   function openProduct(id: string) { setSelected(id); setPhotoIndex(0); setView("product"); }
   function add(id: string) {
     const item = visible.find((entry) => entry.id === id);
-    if (!item || !item.stock) return;
-    setBag((current) => ({ ...current, [id]: Math.min(item.stock || 0, (current[id] || 0) + 1) }));
+    if (!item) return;
+    setBag((current) => ({ ...current, [id]: Math.min(10, (current[id] || 0) + 1) }));
     setQuote(null);
   }
   async function rehearse(event: React.FormEvent<HTMLFormElement>) {
@@ -82,7 +82,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         <button type="button" className="shop-preview-photo" onClick={() => openProduct(item.id)}><img src={item.gallery[0]} alt={item.name} /></button>
         <h3>{item.name}</h3><p>{item.note}</p><strong>{money(item.price)}</strong>
         <div className="shop-preview-card-actions"><button type="button" className="outline-button" onClick={() => openProduct(item.id)}>View item</button>
-          <button type="button" className="small-button" disabled={!item.stock} onClick={() => add(item.id)}>Add to test bag</button></div>
+          <button type="button" className="small-button" onClick={() => add(item.id)}>Add to test bag</button></div>
       </article>)}</div>
       {!visible.length && <p>No items are set to show in the shop yet. Add one in Products.</p>}
     </>}
@@ -91,8 +91,8 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         <div className="shop-preview-thumbs">{product.gallery.map((url, index) => <button type="button" key={`${url}-${index}`} aria-label={`View photo ${index + 1}`} onClick={() => setPhotoIndex(index)}><img src={url} alt="" /></button>)}</div></div>
       <div><button type="button" className="text-link" onClick={() => setView("shop")}>← Back to shop</button>
         <h2>{product.name}</h2><p>{product.description}</p><p>{productCategoryNames(product).join(" · ")}</p>
-        <strong>{money(product.price)}</strong><p>{product.stock || 0} available</p>
-        <button type="button" className="stitch-button" disabled={!product.stock} onClick={() => { add(product.id); setView("bag"); }}>Add to test bag</button></div>
+        <strong>{money(product.price)}</strong><p>Made to order</p>
+        <button type="button" className="stitch-button" onClick={() => { add(product.id); setView("bag"); }}>Add to test bag</button></div>
     </div>}
     {view === "bag" && <>
       <h2>Test bag and checkout</h2><p>This rehearsal checks the address and total. It does not save details or start payment.</p>
@@ -100,7 +100,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         <form className="paper-form" onSubmit={(event) => void rehearse(event)}>
           <h3>Contact and delivery details</h3><p>Email: {email}</p>
           <div className="field"><label htmlFor="preview-name">Full name *</label><input id="preview-name" name="name" required minLength={2} maxLength={80} /></div>
-          <div className="field"><label htmlFor="preview-phone">Indian mobile number *</label><input id="preview-phone" name="phone" type="tel" required pattern="[6-9][0-9]{9}" maxLength={10} /></div>
+          <div className="field"><label htmlFor="preview-phone">Indian mobile number (+91) *</label><input id="preview-phone" name="phone" type="tel" required pattern="(?:[+]91[ -]?)?[6-9](?:[ -]?[0-9]){9}" maxLength={24} placeholder="9876543210 or +91 9876543210" /></div>
           <div className="field"><label htmlFor="preview-choice">Delivery option *</label><select id="preview-choice" value={addressChoice} onChange={(event) => { setAddressChoice(event.target.value as typeof addressChoice); setQuote(null); }}>
             <option value="Aditya Surampalem">Aditya Surampalem · Free</option><option value="Others">Home delivery · ₹69 up to ₹499, free above</option></select></div>
           {addressChoice === "Others" && <>

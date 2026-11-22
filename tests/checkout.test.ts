@@ -18,8 +18,9 @@ test("uses the verified account email and accepts Aditya Surampalem", () => {
   assert.equal(customer.deliveryAddress, "");
 });
 
-test("requires exactly ten Indian mobile digits", () => {
-  for (const phone of ["987654321", "1987654321", "+919876543210", "98765 43210", "98765432100"]) {
+test("accepts Indian mobile numbers with or without the +91 country code", () => {
+  assert.equal(parseCheckoutCustomer({ ...base, phone: "+91 98765 43210" }, "asha@gmail.com").phone, "9876543210");
+  for (const phone of ["987654321", "1987654321", "+449876543210", "98765432100", "1234567890"]) {
     assert.throws(() => parseCheckoutCustomer({ ...base, phone }, "asha@gmail.com"), /mobile/i);
   }
 });

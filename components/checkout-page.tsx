@@ -73,7 +73,7 @@ export default function Checkout({
   testMode: boolean;
   nonce?: string;
 }) {
-  const { cart, refreshPreferences, ready, catalog, stocks } = useShop(),
+  const { cart, refreshPreferences, ready, catalog } = useShop(),
     { user, login, token, error: authError } = useAuth(),
     params = useSearchParams(),
     buy = params.get("buy"),
@@ -508,21 +508,22 @@ export default function Checkout({
                   </div>
                   <div className="field">
                     <label htmlFor="checkout-phone">
-                      Indian mobile number *
+                      Indian mobile number (+91) *
                     </label>
                     <input
                       id="checkout-phone"
                       name="phone"
                       type="tel"
                       required
-                      pattern="[6-9][0-9]{9}"
+                      pattern="(?:[+]91[ -]?)?[6-9](?:[ -]?[0-9]){9}"
                       minLength={10}
-                      maxLength={10}
-                      placeholder="Your 10-digit mobile number"
+                      maxLength={24}
+                      placeholder="9876543210 or +91 9876543210"
                       autoComplete="tel"
                       value={phone}
-                      onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))}
+                      onChange={(event) => setPhone(event.target.value)}
                     />
+                    <small>Use a 10-digit Indian mobile number starting with 6–9. You may include +91.</small>
                   </div>
                   <div className="field">
                     <label htmlFor="address-choice">Delivery option *</label>
@@ -580,9 +581,7 @@ export default function Checkout({
                       (addressChoice === "Others" && !liveQuote) ||
                       !scriptReady ||
                       !!activeAttempt ||
-                      items.some(
-                        (p) => (stocks[p.id] ?? p.stock ?? 0) < p.quantity,
-                      )
+                      items.some((p) => p.quantity > maxQuantity(p))
                     }
                   >
                     {busy
@@ -608,7 +607,7 @@ export default function Checkout({
                   <div>
                     <Link href={`/products/${p.id}`}>{p.name}</Link>
                     <p>Quantity {p.quantity}</p>
-                    {(stocks[p.id] ?? p.stock ?? 0) < p.quantity && (
+                    {p.quantity > maxQuantity(p) && (
                       <span className="form-error">
                         Please update this quantity.
                       </span>

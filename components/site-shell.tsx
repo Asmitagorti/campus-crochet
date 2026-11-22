@@ -36,7 +36,6 @@ type ShopState = {
   ready: boolean;
   settings: SiteSettings;
   catalog: typeof products;
-  stocks: Record<string, number>;
   mode: SiteMode;
 };
 const ShopContext = createContext<ShopState | null>(null);
@@ -74,7 +73,6 @@ export default function SiteShell({
   const [cart, setCart] = useState<Record<string, number>>({}),
     [liked, setLiked] = useState<string[]>([]),
     [ready, setReady] = useState(false),
-    [stocks, setStocks] = useState<Record<string, number>>({}),
     [dark, setDark] = useState(false),
     [menu, setMenu] = useState(false),
     [bag, setBag] = useState(false),
@@ -183,7 +181,6 @@ export default function SiteShell({
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (!active) return;
-          if (data?.stock) setStocks(data.stock);
           if (data?.products) setCatalog(data.products);
         })
         .catch(() => {});
@@ -256,7 +253,7 @@ export default function SiteShell({
     if (!ready || !owned) { setNotice("Your saved bag is still loading. Please try again shortly."); return; }
     const p = catalog.find((p) => p.id === id);
     if (!p) return;
-    const max = Math.min(maxQuantity(p), stocks[id] ?? p.stock ?? 0);
+    const max = maxQuantity(p);
     setCart((c) => {
       const next = { ...c };
       if (n <= 0) delete next[id];
@@ -269,11 +266,7 @@ export default function SiteShell({
     if (!ready || !owned) { setNotice("Your saved bag is still loading. Please try again shortly."); return; }
     const p = catalog.find((p) => p.id === id);
     if (!p) return;
-    const max = Math.min(maxQuantity(p), stocks[id] ?? p.stock ?? 0);
-    if (!max) {
-      setNotice("This little piece has sold out. Ask us about making another.");
-      return;
-    }
+    const max = maxQuantity(p);
     setCart((c) => ({ ...c, [id]: Math.min(max, (c[id] || 0) + n) }));
     setNotice("A little happiness added to your bag ♡");
   }
@@ -296,7 +289,6 @@ export default function SiteShell({
         notify: setNotice,
         openBag: () => setBag(true),
         ready: ready && (!user || owned),
-        stocks,
         catalog,
         settings,
         mode,
@@ -519,7 +511,7 @@ export default function SiteShell({
                                 <button
                                   disabled={
                                     visibleCart[p.id] >=
-                                    Math.min(maxQuantity(p), stocks[p.id] ?? 25)
+                                    maxQuantity(p)
                                   }
                                   aria-label={`Add one ${p.name}`}
                                   onClick={() =>

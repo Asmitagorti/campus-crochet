@@ -12,6 +12,8 @@ test("a saved draft product keeps its private catalogue details", () => {
   assert.deepEqual(result.categories, ["Bags", "Gifts"]);
   assert.deepEqual(result.gallery, ["first", "second"]);
   assert.equal(result.revision, 3);
+  assert.equal(result.stock, null);
+  assert.equal(result.madeToOrder, true);
 });
 
 test("private checkout rehearsal uses the shop delivery threshold and never creates an order", () => {

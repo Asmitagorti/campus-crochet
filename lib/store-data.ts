@@ -38,11 +38,6 @@ export async function loadDraftSettings(): Promise<SiteSettings & { revision: nu
     revision: data.revision };
 }
 
-export async function inventory() {
-  const rows = await loadProducts();
-  return Object.fromEntries(rows.map((row) => [row.id, row.stock || 0]));
-}
-
 export async function loadSettings(key: "settings" | "poll_settings" = "settings"): Promise<SiteSettings> {
   const { data, error } = await adminDatabase().from("site_content").select("data").eq("key", key).maybeSingle();
   if (error) throw error;

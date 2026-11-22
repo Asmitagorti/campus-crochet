@@ -83,13 +83,13 @@ const blank: AdminProduct = {
   category: "",
   categories: [],
   price: 299,
-  stock: 25,
+  stock: null,
   packedWeightGrams: null,
   description: "",
   details: [["Includes", "One handmade crochet piece"]],
   colors: ["#e9b7cc"],
   gallery: [],
-  madeToOrder: false,
+  madeToOrder: true,
   active: false,
   revision: 0,
 };
@@ -508,22 +508,6 @@ export default function Studio() {
                   }
                 />
               </div>
-              <div className="field">
-                <label htmlFor="stock">
-                  Draft stock (sales made while the shop is live are preserved)
-                </label>
-                <input
-                  id="stock"
-                  type="number"
-                  min={0}
-                  step={1}
-                  required
-                  value={editing.stock ?? 0}
-                  onChange={(e) =>
-                    setEditing({ ...editing, stock: Number(e.target.value) })
-                  }
-                />
-              </div>
             </div>
             <div className="field">
               <label htmlFor="description">Description</label>
@@ -687,7 +671,7 @@ export default function Studio() {
                     </span>
                   </div>
                   <strong>{money(p.price)}</strong>
-                  <span>{p.stock} available</span>
+                  <span>Made to order</span>
                   <button
                     className="outline-button"
                     onClick={() => {

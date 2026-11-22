@@ -17,9 +17,8 @@ export async function POST(request: Request) {
     const description = text(body.description, 5000), note = text(body.note, 160);
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || name.length < 3 || description.length < 20)
       throw Error("Please provide a valid slug, name and description.");
-    if (!Number.isInteger(body.price) || body.price < 1 || body.price > 100000 ||
-      !Number.isInteger(body.stock) || body.stock < 0 || body.stock > 100000)
-      throw Error("Price and stock must be valid whole numbers.");
+    if (!Number.isInteger(body.price) || body.price < 1 || body.price > 100000)
+      throw Error("Price must be a valid whole number.");
     if (body.packedWeightGrams != null && (!Number.isInteger(body.packedWeightGrams) ||
       body.packedWeightGrams < 1 || body.packedWeightGrams > 50000))
       throw Error("Packed weight must be a whole number of grams between 1 and 50,000.");
@@ -43,7 +42,7 @@ export async function POST(request: Request) {
       databaseId = product.databaseId;
     }
     const draftData = { name, description, note, category: chosenCategories[0], categories: chosenCategories,
-      price: body.price, stock: body.stock, packedWeightGrams: body.packedWeightGrams ?? null,
+      price: body.price, packedWeightGrams: body.packedWeightGrams ?? null,
       active: body.active === true, details: body.details, colors: body.colors, gallery: body.gallery };
     const db = adminDatabase();
     if (body.create === true) {

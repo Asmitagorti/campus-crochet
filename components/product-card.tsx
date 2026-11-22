@@ -52,7 +52,7 @@ export function ProductCard({
         className="small-button"
         onClick={() => add(p.id)}
       >
-        {canOrder(p) ? "Add to bag" : "Out of stock"} <Plus size={12} />
+        Add to bag <Plus size={12} />
       </button>
     </motion.article>
   );
