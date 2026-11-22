@@ -12,13 +12,17 @@ export async function POST(request: Request) {
     await requireAdminAccess(request);
     await guard(request, 20);
     const body = await readJsonBody(request);
-    if (!["open", "shop", "hold", "pause", "resume", "close"].includes(String(body.action)))
+    if (!["open", "shop", "hold", "resume", "close"].includes(String(body.action)))
       throw Error("Choose a valid poll action.");
     if (body.action === "open" && !isUuid(body.roundId)) throw Error("Choose a draft poll.");
+    if (body.action === "shop" && (!Number.isInteger(body.draftRevision) || body.draftRevision < 0))
+      throw Error("Refresh and review the shop draft before publishing.");
     if (body.action === "open") await requireFinalPollMigration();
-    const { data, error } = await adminDatabase().rpc("poll_admin_transition", {
-      p_action: body.action, p_round: isUuid(body.roundId) ? body.roundId : null,
-    });
+    const { data, error } = body.action === "shop"
+      ? await adminDatabase().rpc("shop_publish_and_open", { p_expected: body.draftRevision })
+      : await adminDatabase().rpc("poll_admin_transition", {
+        p_action: body.action, p_round: isUuid(body.roundId) ? body.roundId : null,
+      });
     if (error) throw error;
     return Response.json({ saved: true, state: data });
   } catch (error) { return errorResponse(error); }

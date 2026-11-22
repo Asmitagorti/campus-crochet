@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { advanceActiveWindow, clampActiveSeconds, parseVisitorCookie, signVisitorCookie } from "../lib/analytics-domain";
+import { advanceActiveWindow, clampActiveSeconds } from "../lib/analytics-domain";
+import { parseVisitorCookie, signVisitorCookie } from "../lib/analytics-cookie";
 
 test("activity pings cannot claim excessive time", () => {
   assert.equal(clampActiveSeconds(18), 18);

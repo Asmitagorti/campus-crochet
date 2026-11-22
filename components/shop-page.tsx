@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Search, SlidersHorizontal, Heart, X, ArrowRight } from "lucide-react";
 import { categories } from "@/lib/catalog";
+import { belongsToCategory, productCategoryNames, visibleCategoryGroups } from "@/lib/product-categories";
 import { ProductCard } from "./product-card";
 import { useShop } from "./site-shell";
 import { Sprig } from "./design";
@@ -16,6 +17,7 @@ export default function Shop() {
     saved = params.get("saved") === "1";
   const [sort, setSort] = useState("featured"),
     [inStock, setInStock] = useState(false);
+  const categoryGroups = visibleCategoryGroups(products, categories.map((item) => item.name));
   function update(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
     if (value && value !== "All") next.set(key, value);
@@ -24,10 +26,10 @@ export default function Shop() {
   }
   let list = products.filter(
     (p) =>
-      (category === "All" || p.category === category) &&
+      (category === "All" || belongsToCategory(p, category)) &&
       (!saved || liked.includes(p.id)) &&
       (!inStock || (stocks[p.id] ?? p.stock ?? 0) > 0) &&
-      `${p.name} ${p.category} ${p.note}`
+      `${p.name} ${productCategoryNames(p).join(" ")} ${p.note}`
         .toLowerCase()
         .includes(q.toLowerCase()),
   );
@@ -57,19 +59,14 @@ export default function Shop() {
             The collection <Heart size={19} />
           </h2>
           <div className="category-filters">
-            {["All", ...categories.map((c) => c.name)].map((c) => (
+            {[{ name: "All", count: products.length }, ...categoryGroups].map(({ name: c, count }) => (
               <button
                 key={c}
                 className={category === c ? "chosen" : ""}
                 onClick={() => update("category", c)}
               >
                 {c === "All" ? "All the little things" : c}
-                <span>
-                  {
-                    products.filter((p) => c === "All" || p.category === c)
-                      .length
-                  }
-                </span>
+                <span>{count}</span>
               </button>
             ))}
           </div>
@@ -167,19 +164,6 @@ export default function Shop() {
           )}
         </section>
       </div>
-      <section className="shop-bottom-note page-wrap">
-        <span>♡</span>
-        <div>
-          <h2>A little idea of your own?</h2>
-          <p>
-            Tell us what you are dreaming of. We will let you know what is
-            possible.
-          </p>
-        </div>
-        <Link className="stitch-button" href="/contact?topic=custom">
-          Let's talk <ArrowRight size={15} />
-        </Link>
-      </section>
     </main>
   );
 }

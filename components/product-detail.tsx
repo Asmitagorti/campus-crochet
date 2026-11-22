@@ -192,7 +192,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             </span>
           </div>
           <p className="quiet-note">
-            Delivery in Aditya Surampalem is included. For supported PIN codes elsewhere, checkout shows the full delivery charge before payment.
+            Aditya Surampalem delivery is free. Home delivery is ₹69 for carts up to ₹499, and free above ₹499.
           </p>
         </section>
       </div>
@@ -259,7 +259,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                   "Contact us for exact measurements before purchasing",
                 ],
                 ["Availability", availability({ ...p, stock })],
-                ["Delivery", "Aditya Surampalem included; supported PIN codes quoted at checkout"],
+                ["Delivery", "Aditya Surampalem free; home delivery ₹69, free above ₹499"],
               ].map(([key, value]) => (
                 <div key={key}>
                   <dt>{key}</dt>

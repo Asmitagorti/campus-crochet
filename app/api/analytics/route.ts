@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { adminDatabase } from "@/lib/supabase-admin";
-import { clampActiveSeconds, isUuid, parseVisitorCookie, signVisitorCookie } from "@/lib/analytics-domain";
+import { clampActiveSeconds, isUuid } from "@/lib/analytics-domain";
+import { parseVisitorCookie, signVisitorCookie } from "@/lib/analytics-cookie";
 import { guard, sameOrigin, errorResponse } from "@/lib/forms";
 
 export const runtime = "nodejs";

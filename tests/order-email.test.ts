@@ -29,12 +29,22 @@ test("completion includes status and uses a distinct event key", () => {
 });
 
 test("delivery orders show the saved charge and complete destination in both emails", () => {
-  const delivery = { ...order, address: "Flat 2, Chennai, Tamil Nadu 600001", subtotalPaise: 59800,
-    deliveryPaise: 12450, totalPaise: 72250 };
+  const delivery = { ...order, address: "Flat 2, Chennai, Tamil Nadu 600001",
+    items: [{ name: "Flower <Card>", quantity: 1, price: 299 }],
+    subtotalPaise: 29900, deliveryPaise: 6900, totalPaise: 36800 };
   for (const kind of ["confirmation", "completion"] as const) {
     const email = composeOrderEmail(kind, delivery);
-    assert.match(email.text, /Delivery charge: ₹124\.50/);
-    assert.match(email.text, /Total paid: ₹722\.50/);
+    assert.match(email.text, /Delivery charge: ₹69/);
+    assert.match(email.text, /Total paid: ₹368/);
     assert.match(email.html, /Flat 2, Chennai, Tamil Nadu 600001/);
+  }
+});
+
+test("free delivery appears in both order emails", () => {
+  const freeDelivery = { ...order, subtotalPaise: 59800, deliveryPaise: 0 };
+  for (const kind of ["confirmation", "completion"] as const) {
+    const email = composeOrderEmail(kind, freeDelivery);
+    assert.match(email.text, /Delivery charge: Free/);
+    assert.match(email.html, /Delivery charge:<\/strong> Free/);
   }
 });

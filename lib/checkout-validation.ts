@@ -1,3 +1,5 @@
+import { validateDestination } from "./indian-postcodes";
+
 export type CheckoutCustomer = {
   name: string;
   email: string;
@@ -5,7 +7,19 @@ export type CheckoutCustomer = {
   addressChoice: "Aditya Surampalem" | "Others";
   deliveryAddress: string;
   deliveryPin: string;
+  addressLine1: string;
+  areaStreet: string;
+  city: string;
+  state: string;
+  landmark: string;
 };
+
+function addressField(body: Record<string, unknown>, key: string, label: string, min: number, max: number) {
+  const value = typeof body[key] === "string" ? body[key].trim().replace(/\s+/g, " ") : "";
+  if (value.length < min || value.length > max || /[\x00-\x1f\x7f]/.test(value))
+    throw Error(`Please enter a valid ${label}.`);
+  return value;
+}
 
 export function parseCheckoutCustomer(body: Record<string, unknown>, registeredEmail: string | undefined): CheckoutCustomer {
   const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -16,13 +30,18 @@ export function parseCheckoutCustomer(body: Record<string, unknown>, registeredE
     throw Error("Your registered email is unavailable. Please sign in again.");
   if (body.consent !== true) throw Error("Please agree to the order and privacy information.");
   if (body.addressChoice === "Others") {
-    const address = typeof body.deliveryAddress === "string" ? body.deliveryAddress.trim() : "";
-    if (address.length < 15 || address.length > 500)
-      throw Error("Please enter your complete delivery address.");
+    const addressLine1 = addressField(body, "addressLine1", "flat, house number or building", 3, 120);
+    const areaStreet = addressField(body, "areaStreet", "area and street", 3, 120);
+    const city = addressField(body, "city", "town or city", 2, 80);
+    const state = addressField(body, "state", "state", 2, 80);
+    const landmark = addressField(body, "landmark", "landmark", 0, 120);
     const deliveryPin = typeof body.deliveryPin === "string" ? body.deliveryPin.trim() : "";
-    if (!/^[1-9]\d{5}$/.test(deliveryPin)) throw Error("Please enter a valid six-digit delivery PIN.");
-    return { name, email: registeredEmail, phone, addressChoice: "Others", deliveryAddress: address, deliveryPin };
+    validateDestination(deliveryPin, state);
+    const deliveryAddress = [addressLine1, areaStreet, city, state, landmark].filter(Boolean).join(", ");
+    return { name, email: registeredEmail, phone, addressChoice: "Others", deliveryAddress,
+      deliveryPin, addressLine1, areaStreet, city, state, landmark };
   }
   if (body.addressChoice !== "Aditya Surampalem") throw Error("Please select an address option.");
-  return { name, email: registeredEmail, phone, addressChoice: "Aditya Surampalem", deliveryAddress: "", deliveryPin: "" };
+  return { name, email: registeredEmail, phone, addressChoice: "Aditya Surampalem", deliveryAddress: "", deliveryPin: "",
+    addressLine1: "", areaStreet: "", city: "", state: "", landmark: "" };
 }

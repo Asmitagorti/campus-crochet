@@ -206,7 +206,7 @@ export default function Contact() {
           },
           {
             q: "How will I get my order?",
-            a: "Choose Aditya Surampalem for delivery included in the product price. For other addresses, enter your PIN at checkout to see whether delivery is available and the full charge before payment.",
+            a: "Aditya Surampalem delivery is free. Home delivery is ₹69 for carts up to ₹499 and free when the cart subtotal is above ₹499. Enter your state and matching PIN at checkout to confirm the final total.",
           },
           {
             q: "Can I ask for exact measurements?",

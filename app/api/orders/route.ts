@@ -10,6 +10,7 @@ import { guard, text, errorResponse } from "@/lib/forms";
 import { parseCheckoutCustomer } from "@/lib/checkout-validation";
 import { readJsonBody } from "@/lib/request-body";
 import { requireShoppingMode } from "@/lib/site-mode";
+import { saveCheckoutDetails } from "@/lib/saved-checkout";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
       row = await orderById(id);
       if (!row) throw Error("Order could not be loaded. Please contact support.");
     }
+    if (body.saveDetails === true) await saveCheckoutDetails(user.uid, customer);
     const claim = randomUUID();
     await claimGateway(row.id, claim);
     await requireShoppingMode();

@@ -5,6 +5,7 @@ import { quoteDelivery } from "@/lib/delivery-quote";
 import { guard, errorResponse } from "@/lib/forms";
 import { readJsonBody } from "@/lib/request-body";
 import { requireShoppingMode } from "@/lib/site-mode";
+import { validateDestination } from "@/lib/indian-postcodes";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,8 @@ export async function POST(request: Request) {
     await requireUser(request);
     const body = await readJsonBody(request);
     const pin = typeof body.deliveryPin === "string" ? body.deliveryPin.trim() : "";
-    if (!/^[1-9]\d{5}$/.test(pin)) throw Error("Please enter a valid six-digit delivery PIN.");
+    const state = typeof body.state === "string" ? body.state.trim() : "";
+    validateDestination(pin, state);
     const items = resolveCheckoutItems(body.items, await loadProducts());
     const quote = await quoteDelivery(items, pin);
     return Response.json(quote, { headers: { "Cache-Control": "no-store" } });

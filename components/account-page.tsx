@@ -155,7 +155,7 @@ export default function Account() {
                     </p>
                   ))}
                   {o.customer?.addressChoice && <p>Deliver to: {o.customer.addressChoice}{o.customer.deliveryAddress ? ` · ${o.customer.deliveryAddress}` : ""}{o.customer.deliveryPin ? ` · ${o.customer.deliveryPin}` : ""}</p>}
-                  <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery: {o.deliveryPaise ? money(o.deliveryPaise / 100) : "Included"}</p>
+                  <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery: {o.deliveryPaise ? money(o.deliveryPaise / 100) : "Free"}</p>
                   <strong>Total: {money(o.amount / 100)}</strong>
                   {o.paymentStatus === "paid" && <ol className="order-progress" aria-label={`Order ${o.id} progress`}>
                     {["Confirmed", "Preparing", "Completed"].map((stage, index) => <li key={stage} className={progress.step >= index + 1 ? "done" : ""} aria-current={progress.step === index + 1 ? "step" : undefined}>{stage}</li>)}

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Heart, Plus, Upload } from "lucide-react";
 import { movePollImage, pollImageUrls } from "@/lib/poll-domain";
+import type { SiteSettings } from "@/lib/site-settings";
 
 export type AdminPoll = {
   id: string; title: string; description: string; status: "draft" | "open" | "closed";
@@ -11,10 +12,13 @@ export type AdminPoll = {
 };
 type DraftPicture = { url: string; file?: File };
 
-export default function StudioPolls({ mode, activePollId, polls, token, onSaved }: {
+export default function StudioPolls({ mode, activePollId, polls, pollSettings, token, onSaved }: {
   mode: "shop" | "poll"; activePollId: string | null; polls: AdminPoll[];
+  pollSettings: SiteSettings & { revision: number };
   token: () => Promise<string>; onSaved: () => Promise<void>;
 }) {
+  const [homepagePictures, setHomepagePictures] = useState(pollSettings);
+  useEffect(() => setHomepagePictures(pollSettings), [pollSettings]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [draftPictures, setDraftPictures] = useState<DraftPicture[]>([]);
@@ -83,17 +87,16 @@ export default function StudioPolls({ mode, activePollId, polls, token, onSaved 
     finally { setBusy(false); }
   }
   function resetItem() { setName(""); clearDraftPreviews(); setDraftPictures([]); setEditingId(null); setAddingToId(null); chooseExtraPhotos([]); setReorderingId(null); setReorderImages([]); }
-  function changeMode(action: "open" | "shop" | "hold" | "resume" | "close", roundId?: string) {
+  function changeMode(action: "open" | "hold" | "resume" | "close", roundId?: string) {
     const message = action === "open" || action === "resume"
       ? "Show this poll to visitors and stop new checkout payments?"
-      : action === "shop" ? "Show the selling website and allow new checkout payments?"
-        : action === "hold" ? "Hide checkout and show the poll coming-soon page?"
+      : action === "hold" ? "Hide checkout and show the poll coming-soon page?"
         : "Close this poll permanently and show the poll coming-soon page?";
     if (!window.confirm(message)) return;
     void run(async () => {
       await post("/api/admin/mode", { action, roundId });
       window.dispatchEvent(new CustomEvent("campus-mode-changed", {
-        detail: ["open", "resume", "hold", "close"].includes(action) ? "poll" : "shop",
+        detail: "poll",
       }));
     }, "Website mode updated.");
   }
@@ -107,18 +110,50 @@ export default function StudioPolls({ mode, activePollId, polls, token, onSaved 
     if (!response.ok) throw Error(data.error || "Picture upload failed.");
     return String(data.url);
   }
+  async function uploadHomepagePhoto(file: File, key: "heroImage" | "storyBackgroundImage" | "storyImage") {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const url = await uploadImage(file);
+      setHomepagePictures((current) => ({ ...current, [key]: url }));
+      setNotice("Picture uploaded. Save the poll pictures to make it visible.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Picture upload failed."); }
+    finally { setBusy(false); }
+  }
 
   return <section className="studio-polls">
     <div className="studio-section-heading"><div><h2>Design poll</h2><p>Add an item with its name and up to eight pictures. Visitors can choose several items, then submit one final vote.</p></div></div>
     <div className="paper-form studio-editor">
       <h3>Visitors currently see: {mode === "poll" ? activePollId ? "the open poll" : "poll coming soon" : "the selling website"}</h3>
       <div className="poll-actions">
-        {mode === "poll" && <button type="button" className="outline-button" disabled={busy} onClick={() => changeMode("shop")}>Show selling website</button>}
+        {mode === "poll" && <p>When the shop draft is ready, preview and publish it from Shop setup.</p>}
         {mode === "shop" && activePollId && <button type="button" className="stitch-button" disabled={busy} onClick={() => changeMode("resume")}>Show the open poll</button>}
         {mode === "shop" && !activePollId && <button type="button" className="outline-button" disabled={busy} onClick={() => changeMode("hold")}>Show poll coming-soon page</button>}
         {activePollId && <button type="button" className="outline-button" disabled={busy} onClick={() => changeMode("close")}>Close current poll</button>}
       </div>
     </div>
+    <details className="paper-form studio-editor">
+      <summary>Poll homepage pictures</summary>
+      <p>These three pictures belong to the poll homepage. Saving them updates the visible poll page; the shop draft stays private.</p>
+      <div className="site-image-grid">
+        {([
+          ["heroImage", "Main hero image"],
+          ["storyBackgroundImage", "Story background"],
+          ["storyImage", "Story photo"],
+        ] as const).map(([key, label]) => <div className="site-image-field" key={key}>
+          <img src={homepagePictures[key]} alt={`${label} preview`} />
+          <h3>{label}</h3>
+          <label className="outline-button"><Upload size={15} /> Choose picture
+            <input type="file" hidden accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy}
+              onChange={(event) => { const file = event.currentTarget.files?.[0];
+                if (file) void uploadHomepagePhoto(file, key);
+                event.currentTarget.value = "";
+              }} />
+          </label>
+        </div>)}
+      </div>
+      <button type="button" className="stitch-button" disabled={busy}
+        onClick={() => void run(async () => { await post("/api/admin/poll-content", homepagePictures); }, "Poll homepage pictures saved.")}>Save poll pictures</button>
+    </details>
     {error && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="form-success" role="status">{notice}</p>}
     {!draft && <div className="paper-form studio-editor">

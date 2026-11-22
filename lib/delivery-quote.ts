@@ -1,5 +1,6 @@
 import "server-only";
 import { adminDatabase } from "./supabase-admin";
+import { verifyDeliveryQuote } from "./delivery-policy";
 
 export type DeliveryQuote = {
   subtotalPaise: number;
@@ -15,5 +16,5 @@ export async function quoteDelivery(items: { productId: string; quantity: number
   const { data, error } = await adminDatabase().rpc("shop_quote_delivery", { p_items: items, p_pin: pin });
   if (error) throw error;
   if (!data || typeof data !== "object") throw Error("Delivery quote is unavailable.");
-  return data as DeliveryQuote;
+  return verifyDeliveryQuote(data as DeliveryQuote, pin !== null);
 }

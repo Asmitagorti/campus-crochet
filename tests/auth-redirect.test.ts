@@ -7,6 +7,9 @@ test("Google sign-in returns to the intended page even when the provider lands a
   assert.equal(afterGoogleDestination("/admin", true), "/admin");
   assert.equal(afterGoogleDestination("/admin", false), "/account");
   assert.equal(afterGoogleDestination("/account", false), "/account");
+  assert.equal(afterGoogleDestination("/checkout", false), "/checkout");
+  assert.equal(afterGoogleDestination("/checkout?buy=bunny&quantity=2", false), "/checkout?buy=bunny&quantity=2");
+  assert.equal(afterGoogleDestination("/checkout?buy=https://evil.example", false), null);
   assert.equal(afterGoogleDestination("https://evil.example", true), null);
 });
 

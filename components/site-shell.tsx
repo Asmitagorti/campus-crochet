@@ -544,7 +544,7 @@ export default function SiteShell({
                         <strong>Subtotal</strong>
                         <strong>{money(total)}</strong>
                       </div>
-                      <p>Aditya Surampalem delivery included. For supported PIN codes elsewhere, checkout shows delivery before payment.</p>
+                      <p>Aditya Surampalem delivery is free. Home delivery is ₹69, or free when your bag is above ₹499.</p>
                       <Link
                         className="stitch-button full-button"
                         href="/checkout"

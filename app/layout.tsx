@@ -23,10 +23,10 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [initialProducts, initialSettings, initialMode] = await Promise.all([
+  const initialMode = await loadDisplayMode();
+  const [initialProducts, initialSettings] = await Promise.all([
     loadProducts(),
-    loadSettings(),
-    loadDisplayMode(),
+    loadSettings(initialMode === "poll" ? "poll_settings" : "settings"),
   ]);
   return (
     <html lang="en" suppressHydrationWarning>

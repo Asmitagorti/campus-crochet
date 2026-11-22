@@ -1,9 +1,10 @@
 import { validImage } from "@/lib/image-url";
 import { adminDatabase } from "@/lib/supabase-admin";
 import { requireAdminAccess } from "@/lib/admin-access";
-import { loadProducts } from "@/lib/store-data";
+import { loadDraftProducts } from "@/lib/store-data";
 import { guard, text, errorResponse } from "@/lib/forms";
 import { categories } from "@/lib/catalog";
+import { parseProductCategories, productCategoryNames } from "@/lib/product-categories";
 import { readJsonBody } from "@/lib/request-body";
 
 export const runtime = "nodejs";
@@ -22,7 +23,6 @@ export async function POST(request: Request) {
     if (body.packedWeightGrams != null && (!Number.isInteger(body.packedWeightGrams) ||
       body.packedWeightGrams < 1 || body.packedWeightGrams > 50000))
       throw Error("Packed weight must be a whole number of grams between 1 and 50,000.");
-    if (!categories.some((category) => category.name === body.category)) throw Error("Please select a collection.");
     if (!Array.isArray(body.gallery) || body.gallery.length < 1 || body.gallery.length > 8 || !body.gallery.every(validImage))
       throw Error("Add between one and eight photos from Supabase Storage.");
     if (!Array.isArray(body.colors) || body.colors.length > 8 ||
@@ -33,20 +33,30 @@ export async function POST(request: Request) {
         detail.every((value: unknown) => typeof value === "string" && value.length < 400)))
       throw Error("Please check product specifications.");
     if (!Number.isInteger(body.revision) || body.revision < 0) throw Error("Refresh this product before saving.");
+    const products = await loadDraftProducts();
+    const chosenCategories = parseProductCategories(body.categories, body.category,
+      [...categories.map((item) => item.name), ...products.flatMap(productCategoryNames)]);
     let databaseId: string | null = null;
     if (!body.create) {
-      const product = (await loadProducts(true)).find((p) => p.id === slug);
+      const product = products.find((p) => p.id === slug);
       if (!product?.databaseId) throw Error("Product not found.");
       databaseId = product.databaseId;
     }
-    const { data, error } = await adminDatabase().rpc("shop_save_product", {
-      p_id: databaseId, p_expected: body.revision,
-      p_fields: { slug, name, description, note, category: body.category,
-        price: body.price, stock: body.stock, packedWeightGrams: body.packedWeightGrams ?? null, active: body.active === true,
-        details: body.details, colors: body.colors },
-      p_images: body.gallery,
-    });
+    const draftData = { name, description, note, category: chosenCategories[0], categories: chosenCategories,
+      price: body.price, stock: body.stock, packedWeightGrams: body.packedWeightGrams ?? null,
+      active: body.active === true, details: body.details, colors: body.colors, gallery: body.gallery };
+    const db = adminDatabase();
+    if (body.create === true) {
+      const { data, error } = await db.from("shop_product_drafts")
+        .insert({ slug, data: draftData }).select("draft_id").single();
+      if (error) throw error;
+      return Response.json({ saved: true, id: data.draft_id });
+    }
+    const { data, error } = await db.from("shop_product_drafts")
+      .update({ data: draftData, revision: body.revision + 1, updated_at: new Date().toISOString() })
+      .eq("draft_id", databaseId!).eq("revision", body.revision).select("draft_id").maybeSingle();
     if (error) throw error;
-    return Response.json({ saved: true, id: data });
+    if (!data) throw Error("This draft changed. Refresh before saving.");
+    return Response.json({ saved: true, id: data.draft_id });
   } catch (error) { return errorResponse(error); }
 }

@@ -36,11 +36,12 @@ export async function POST(request: Request) {
         data[key] = text(body[key], key === "aboutIntro" || key === "contactIntro" ? 5000 : 1500);
       if (!validImage(data.heroImage) || !validImage(data.storyBackgroundImage) || !validImage(data.storyImage))
         throw Error("Choose images uploaded to Supabase Storage for the site pictures.");
-      const { data: result, error } = await db.rpc("shop_save_content", {
-        p_key: "settings", p_expected: body.revision, p_data: data, p_published: true,
-      });
+      const { data: result, error } = await db.from("shop_content_drafts")
+        .update({ data, revision: body.revision + 1, updated_at: new Date().toISOString() })
+        .eq("key", "settings").eq("revision", body.revision).select("revision").maybeSingle();
       if (error) throw error;
-      return Response.json({ saved: true, revision: result });
+      if (!result) throw Error("This draft changed. Refresh before saving.");
+      return Response.json({ saved: true, revision: result.revision });
     }
     if (body.type === "journey") {
       const slug = text(body.slug, 80);
@@ -54,11 +55,22 @@ export async function POST(request: Request) {
       const data = { slug, title: text(body.title, 150), category: text(body.category, 80),
         excerpt: text(body.excerpt, 500), readTime: text(body.readTime, 50), image: body.image,
         sections: body.sections };
-      const { data: result, error } = await db.rpc("shop_save_content", {
-        p_key: `journey/${slug}`, p_expected: body.revision, p_data: data, p_published: body.published === true,
-      });
-      if (error) throw error;
-      return Response.json({ saved: true, revision: result });
+      const existing = await db.from("shop_journey_drafts").select("revision").eq("slug", slug).maybeSingle();
+      if (existing.error) throw existing.error;
+      if (!existing.data) {
+        if (body.revision !== 0) throw Error("This chapter changed. Refresh before saving.");
+        const inserted = await db.from("shop_journey_drafts")
+          .insert({ slug, data, published: body.published === true, revision: 1 }).select("revision").single();
+        if (inserted.error) throw inserted.error;
+        return Response.json({ saved: true, revision: inserted.data.revision });
+      }
+      const updated = await db.from("shop_journey_drafts")
+        .update({ data, published: body.published === true, revision: body.revision + 1,
+          updated_at: new Date().toISOString() })
+        .eq("slug", slug).eq("revision", body.revision).select("revision").maybeSingle();
+      if (updated.error) throw updated.error;
+      if (!updated.data) throw Error("This chapter changed. Refresh before saving.");
+      return Response.json({ saved: true, revision: updated.data.revision });
     }
     throw Error("Unknown content type.");
   } catch (error) { return errorResponse(error); }

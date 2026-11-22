@@ -1,4 +1,5 @@
 import { Product } from "./catalog";
+import { productCategoryNames } from "./product-categories";
 
 type ImageRow = { image_url?: string; display_order?: number };
 export type StoreProductRow = {
@@ -6,6 +7,7 @@ export type StoreProductRow = {
   slug: string;
   name: string;
   category?: string;
+  categories?: string[];
   short_description?: string;
   full_description?: string;
   price?: number;
@@ -20,11 +22,13 @@ export type StoreProductRow = {
 
 export function mapStoreProduct(row: StoreProductRow): Product {
   const details = Array.isArray(row.details) ? row.details.filter((d): d is [string, string] => Array.isArray(d) && d.length === 2 && d.every((v) => typeof v === "string")) : [];
+  const categoryNames = productCategoryNames({ category: row.category || "Accessories", categories: row.categories });
   return {
     id: row.slug,
     databaseId: row.product_id,
     name: row.name,
-    category: row.category || "Accessories",
+    category: categoryNames[0],
+    categories: categoryNames,
     note: row.short_description || "",
     description: row.full_description || "",
     price: Number(row.price || 0),

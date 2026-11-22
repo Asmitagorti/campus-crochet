@@ -3,11 +3,13 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "./auth-provider";
 import { Product, categories, money } from "@/lib/catalog";
+import { parseProductCategories, productCategoryNames } from "@/lib/product-categories";
 import { JournalEntry } from "@/lib/journal";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
 import { orderProgress } from "@/lib/order-progress";
 import StudioPolls, { type AdminPoll } from "./studio-polls";
 import StudioAnalytics from "./studio-analytics";
+import StudioShopPreview from "./studio-shop-preview";
 import {
   Plus,
   Upload,
@@ -24,10 +26,8 @@ import {
   Heart,
 } from "lucide-react";
 type AdminProduct = Product & { active: boolean; revision: number };
-const siteImages: { key: "heroImage" | "storyBackgroundImage" | "storyImage"; label: string; help: string }[] = [
+const siteImages: { key: "heroImage"; label: string; help: string }[] = [
   { key: "heroImage", label: "Main hero image", help: "The large picture at the top of the page." },
-  { key: "storyBackgroundImage", label: "Story background", help: "The soft photo behind ‘A little story’ in poll mode." },
-  { key: "storyImage", label: "Story photo", help: "The picture in the tilted frame beside the story." },
 ];
 type StudioOrder = {
   mode?: string;
@@ -53,7 +53,6 @@ type StudioOrder = {
   items: { name: string; quantity: number; price: number }[];
   created_at: string;
 };
-type DeliveryRate = { destination_pin: string; max_weight_grams: number; postage_paise: number; active: boolean; verified_at: string };
 type Message = {
   id: string;
   name: string;
@@ -66,19 +65,23 @@ type Chapter = JournalEntry & { published: boolean; revision: number };
 type StudioData = {
   products: AdminProduct[];
   siteMode: "shop" | "poll";
+  shopDraftDirty: boolean;
+  shopDraftRevision: number;
+  shopLastPublishedAt: string | null;
   activePollId: string | null;
   polls: AdminPoll[];
-  deliveryRates: DeliveryRate[];
   orders: StudioOrder[];
   messages: Message[];
   journey: Chapter[];
   settings: SiteSettings & { revision: number };
+  pollSettings: SiteSettings & { revision: number };
 };
 const blank: AdminProduct = {
   id: "",
   name: "",
   note: "",
-  category: "Accessories",
+  category: "",
+  categories: [],
   price: 299,
   stock: 25,
   packedWeightGrams: null,
@@ -107,15 +110,43 @@ export default function Studio() {
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
     [editing, setEditing] = useState<AdminProduct | null>(null),
-    [rate, setRate] = useState<{ pin: string; grams: string; rupees: string; active: boolean; existing: boolean }>({ pin: "", grams: "", rupees: "", active: true, existing: false }),
-    [rateVerified, setRateVerified] = useState(false),
-    [rateEditorOpen, setRateEditorOpen] = useState(false),
+    [newCategory, setNewCategory] = useState(""),
     [isNew, setIsNew] = useState(false),
     [chapter, setChapter] = useState<Chapter | null>(null),
     [settings, setSettings] = useState<SiteSettings & { revision: number }>({
       ...defaultSettings,
       revision: 0,
     });
+  const defaultCategoryNames = categories.map((item) => item.name);
+  const categoryChoices = [
+    ...defaultCategoryNames,
+    ...Array.from(new Set([
+      ...(data?.products || []).flatMap(productCategoryNames),
+      ...(editing ? productCategoryNames(editing) : []),
+    ].filter((name) => !defaultCategoryNames.includes(name)))).sort((a, b) => a.localeCompare(b)),
+  ];
+  function chooseCategory(name: string, checked: boolean) {
+    if (!editing) return;
+    const selected = productCategoryNames(editing);
+    try {
+      const next = parseProductCategories(checked ? [...selected, name] : selected.filter((item) => item !== name), null);
+      setEditing({ ...editing, category: next[0], categories: next });
+      setError("");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Check your categories."); }
+  }
+  function addCategory() {
+    if (!editing) return;
+    const name = newCategory.trim().replace(/\s+/g, " ");
+    const existing = categoryChoices.find((item) => item.toLocaleLowerCase("en-IN") === name.toLocaleLowerCase("en-IN"));
+    const selected = productCategoryNames(editing);
+    if (existing && selected.includes(existing)) { setError("This category is already selected."); return; }
+    try {
+      const next = parseProductCategories([...selected, existing || name], null);
+      setEditing({ ...editing, category: next[0], categories: next });
+      setNewCategory("");
+      setError("");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Check the new category name."); }
+  }
   const load = useCallback(async () => {
     try {
       setError("");
@@ -191,7 +222,9 @@ export default function Studio() {
         }),
         d = await r.json();
       if (!r.ok) throw Error(d.error || "Could not save.");
-      setNotice("Saved with a little care.");
+      setNotice(url === "/api/admin/products" || body && typeof body === "object" && "type" in body &&
+        (body.type === "settings" || body.type === "journey")
+        ? "Saved privately in the shop draft." : "Saved with a little care.");
       await load();
       return true;
     } catch (e) {
@@ -325,6 +358,7 @@ export default function Studio() {
       </div>
       <nav className="studio-tabs" aria-label="Studio sections">
         {[
+          { id: "shop-setup", Icon: ShoppingBag },
           { id: "products", Icon: Package },
           { id: "polls", Icon: Heart },
           { id: "analytics", Icon: Heart },
@@ -344,7 +378,7 @@ export default function Studio() {
             }}
           >
             <Icon size={16} />
-            {id === "settings" ? "Site content" : id === "delivery" ? "Delivery setup" : id[0].toUpperCase() + id.slice(1)}
+            {id === "shop-setup" ? "Shop setup" : id === "settings" ? "Site content" : id === "delivery" ? "Delivery setup" : id[0].toUpperCase() + id.slice(1)}
           </button>
         ))}
       </nav>
@@ -359,16 +393,41 @@ export default function Studio() {
           {notice}
         </p>
       )}
+      {tab === "shop-setup" && data && <section className="studio-shop-setup">
+        <div className="studio-section-heading"><div><h2>Prepare the selling website</h2>
+          <p>Changes to products and site content are private drafts. Preview them here, then publish when you are ready to show the shop.</p></div></div>
+        <div className="paper-form studio-editor">
+          <h3>Visitors currently see: {data.siteMode === "poll" ? data.activePollId ? "the design poll" : "the poll holding page" : "the selling website"}</h3>
+          <p>{data.shopDraftDirty ? "You have unpublished shop changes." : "Your saved shop draft matches the last publication."}
+            {data.shopLastPublishedAt && ` Last published ${new Date(data.shopLastPublishedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`}</p>
+          <div className="poll-actions">
+            <button type="button" className="outline-button" onClick={() => setTab("products")}>Edit products</button>
+            <button type="button" className="outline-button" onClick={() => setTab("settings")}>Edit site content</button>
+            <button type="button" className="outline-button" onClick={() => setTab("journey")}>Edit journey</button>
+            {data.siteMode === "poll" && <button type="button" className="stitch-button" disabled={busy} onClick={async () => {
+              if (!window.confirm("Publish this shop draft, show the selling website to everyone, and allow real payments?")) return;
+              if (await save("/api/admin/mode", { action: "shop", draftRevision: data.shopDraftRevision }))
+                window.dispatchEvent(new CustomEvent("campus-mode-changed", { detail: "shop" }));
+            }}>Publish draft and show shop</button>}
+            {data.siteMode === "shop" && <p>To show a revised shop, switch to the poll in Polls, check the draft here, then publish it.</p>}
+          </div>
+        </div>
+        <StudioShopPreview products={data.products} settings={data.settings} journey={data.journey}
+          email={user.email || ""} token={token} />
+      </section>}
       {tab === "products" &&
         (editing ? (
           <form
             className="studio-editor paper-form"
             onSubmit={async (e) => {
               e.preventDefault();
+              if (!productCategoryNames(editing).length) { setError("Choose at least one category."); return; }
               if (
                 await save("/api/admin/products", { ...editing, create: isNew })
-              )
+              ) {
                 setEditing(null);
+                setNewCategory("");
+              }
             }}
           >
             <div className="editor-top">
@@ -376,7 +435,7 @@ export default function Studio() {
               <button
                 type="button"
                 className="outline-button"
-                onClick={() => setEditing(null)}
+                onClick={() => { setEditing(null); setNewCategory(""); }}
               >
                 Back to products
               </button>
@@ -407,20 +466,24 @@ export default function Studio() {
                   }
                 />
               </div>
-              <div className="field">
-                <label htmlFor="category">Collection</label>
-                <select
-                  id="category"
-                  value={editing.category}
-                  onChange={(e) =>
-                    setEditing({ ...editing, category: e.target.value })
-                  }
-                >
-                  {categories.map((c) => (
-                    <option key={c.name}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
+              <fieldset className="field product-categories-editor">
+                <legend>Collections (choose one or more)</legend>
+                <div className="product-category-choices">
+                  {categoryChoices.map((name) => <label key={name}>
+                    <input type="checkbox" checked={productCategoryNames(editing).includes(name)}
+                      onChange={(event) => chooseCategory(name, event.target.checked)} />
+                    {name}
+                  </label>)}
+                </div>
+                <div className="new-category-row">
+                  <input aria-label="New category name" value={newCategory} maxLength={50}
+                    onChange={(event) => setNewCategory(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCategory(); } }}
+                    placeholder="New category name" />
+                  <button type="button" className="outline-button" onClick={addCategory} disabled={!newCategory.trim()}>Add category</button>
+                </div>
+                <small>New categories appear on the website when a published product uses them.</small>
+              </fieldset>
               <div className="field">
                 <label htmlFor="tagline">Short note</label>
                 <input
@@ -447,7 +510,7 @@ export default function Studio() {
               </div>
               <div className="field">
                 <label htmlFor="stock">
-                  Available stock (excludes payment reservations)
+                  Draft stock (sales made while the shop is live are preserved)
                 </label>
                 <input
                   id="stock"
@@ -460,13 +523,6 @@ export default function Studio() {
                     setEditing({ ...editing, stock: Number(e.target.value) })
                   }
                 />
-              </div>
-              <div className="field">
-                <label htmlFor="packed-weight">Packed shipping weight (grams)</label>
-                <input id="packed-weight" type="number" min={1} max={50000} step={1}
-                  value={editing.packedWeightGrams ?? ""} placeholder="Weigh the packed parcel"
-                  onChange={(e) => setEditing({ ...editing, packedWeightGrams: e.target.value ? Number(e.target.value) : null })} />
-                <small>Needed for delivery outside Aditya Surampalem. Include packaging.</small>
               </div>
             </div>
             <div className="field">
@@ -598,7 +654,7 @@ export default function Studio() {
                   setEditing({ ...editing, active: e.target.checked })
                 }
               />{" "}
-              Publish in the shop
+              Show when shop goes live
             </label>
             <button className="stitch-button" disabled={busy}>
               <Save size={16} />
@@ -613,6 +669,7 @@ export default function Studio() {
                 className="stitch-button"
                 onClick={() => {
                   setEditing(structuredClone(blank));
+                  setNewCategory("");
                   setIsNew(true);
                 }}
               >
@@ -626,7 +683,7 @@ export default function Studio() {
                   <div>
                     <h3>{p.name}</h3>
                     <span>
-                      {p.category} · {p.active ? "Published" : "Hidden"}
+                      {productCategoryNames(p).join(", ")} · {p.active ? "In shop draft" : "Hidden from shop"}
                     </span>
                   </div>
                   <strong>{money(p.price)}</strong>
@@ -635,6 +692,7 @@ export default function Studio() {
                     className="outline-button"
                     onClick={() => {
                       setEditing(structuredClone(p));
+                      setNewCategory("");
                       setIsNew(false);
                     }}
                   >
@@ -647,45 +705,16 @@ export default function Studio() {
         ))}
       {tab === "delivery" && (
         <section>
-          <h2>Delivery outside Aditya</h2>
+          <h2>Delivery pricing</h2>
           <div className="paper-form studio-editor">
-            <p>You do not need this while the design poll is open. For future orders outside Aditya, the customer enters an address and PIN. The site uses that PIN and the items’ packed weight to find a saved price here. It does not ask India Post for a live price.</p>
-            <ol>
-              <li>Enter each product’s <strong>packed weight</strong> in Products, including packaging.</li>
-              <li>Check the full India Post Parcel Retail price from Kakinada <strong>533001</strong> to the destination PIN at that weight in <a href="https://www.indiapost.gov.in/calculate-postage" target="_blank" rel="noreferrer">India Post’s calculator</a>.</li>
-              <li>Save that quote below. Checkout adds exactly <strong>₹15</strong>. For example, an ₹80 quote becomes a ₹95 delivery charge.</li>
-            </ol>
-            <p className="quiet-note">Only PINs and parcel weights with an enabled saved rate can pay online.</p>
+            <p>Aditya Surampalem delivery is free. Home delivery anywhere in India is <strong>₹69</strong> when the cart subtotal is ₹499 or less. A cart subtotal <strong>above ₹499</strong> gets free home delivery.</p>
+            <p>Customers choose a state and enter a matching Indian PIN. Checkout shows the final total before opening Razorpay. No rate or product weight setup is needed.</p>
+            <p className="quiet-note">These prices are set in the shop’s delivery policy. The old PIN and weight rates are kept in the database as history but are not used.</p>
           </div>
-          <details className="paper-form studio-editor" open={rateEditorOpen} onToggle={(event) => setRateEditorOpen(event.currentTarget.open)}>
-            <summary>{rate.existing ? "Edit saved rate" : "Add a verified delivery rate"}</summary>
-          <form onSubmit={(event) => {
-            event.preventDefault();
-            if (!/^\d+(\.\d{1,2})?$/.test(rate.rupees)) { setError("Enter the exact quoted rupees and paise."); return; }
-            void save("/api/admin/delivery-rates", {
-              destinationPin: rate.pin, maxWeightGrams: Number(rate.grams),
-              postagePaise: Math.round(Number(rate.rupees) * 100), active: rate.active, verified: rateVerified,
-            }).then((ok) => { if (ok) { setRate({ pin: "", grams: "", rupees: "", active: true, existing: false }); setRateVerified(false); setRateEditorOpen(false); } });
-          }}>
-            <div className="form-columns">
-              <div className="field"><label htmlFor="rate-pin">Customer’s destination PIN</label><input id="rate-pin" inputMode="numeric" pattern="[1-9][0-9]{5}" maxLength={6} required disabled={rate.existing} value={rate.pin} onChange={(event) => setRate({ ...rate, pin: event.target.value })} /><small>The six-digit PIN the customer will type at checkout.</small></div>
-              <div className="field"><label htmlFor="rate-grams">Covers packed orders up to (grams)</label><input id="rate-grams" type="number" min={1} max={50000} step={1} required disabled={rate.existing} value={rate.grams} onChange={(event) => setRate({ ...rate, grams: event.target.value })} /><small>For example, 500 covers parcels weighing 500 g or less.</small></div>
-              <div className="field"><label htmlFor="rate-price">Full India Post quote (₹, including tax)</label><input id="rate-price" type="number" min={0.01} max={10000} step={0.01} required value={rate.rupees} onChange={(event) => setRate({ ...rate, rupees: event.target.value })} /><small>Copy the final amount shown by India Post. We add ₹15 for the customer.</small></div>
-            </div>
-            <label className="consent"><input type="checkbox" checked={rate.active} onChange={(event) => setRate({ ...rate, active: event.target.checked })} /> Enable this PIN and weight slab</label>
-            <label className="consent"><input type="checkbox" checked={rateVerified} onChange={(event) => setRateVerified(event.target.checked)} required={rate.active} /> I checked the full payable quote from 533001 in India Post’s calculator.</label>
-            <button className="stitch-button" disabled={busy}>{busy ? "Saving…" : "Save delivery rate"}</button>
-          </form>
-          </details>
-          {data?.deliveryRates.map((entry) => <article className="studio-record editor-top" key={`${entry.destination_pin}/${entry.max_weight_grams}`}>
-            <div><h3>{entry.destination_pin} · up to {entry.max_weight_grams} g</h3><p>India Post {money(entry.postage_paise / 100)} · Customer delivery {money((entry.postage_paise + 1500) / 100)} · {entry.active ? "Enabled" : "Disabled"}</p></div>
-            <button className="outline-button" type="button" onClick={() => { setRate({ pin: entry.destination_pin, grams: String(entry.max_weight_grams), rupees: (entry.postage_paise / 100).toFixed(2), active: entry.active, existing: true }); setRateVerified(false); setRateEditorOpen(true); }}>Edit</button>
-          </article>)}
-          {!data?.deliveryRates.length && <p>No delivery rates are enabled yet. Add a verified destination to offer “Others” checkout.</p>}
         </section>
       )}
       {tab === "polls" && data && <StudioPolls mode={data.siteMode} activePollId={data.activePollId}
-        polls={data.polls} token={token} onSaved={load} />}
+        polls={data.polls} pollSettings={data.pollSettings} token={token} onSaved={load} />}
       {tab === "analytics" && <StudioAnalytics token={token} />}
       {tab === "orders" && (
         <section>
@@ -918,7 +947,7 @@ export default function Studio() {
                   setChapter({ ...chapter, published: e.target.checked })
                 }
               />{" "}
-              Publish chapter
+              Show this chapter when shop goes live
             </label>
             <button className="stitch-button" disabled={busy}>
               <Save size={16} /> Save chapter
@@ -951,7 +980,7 @@ export default function Studio() {
               <article className="studio-record editor-top" key={j.slug}>
                 <div>
                   <h3>{j.title}</h3>
-                  <p>{j.published ? "Published" : "Draft"}</p>
+                  <p>{j.published ? "In shop draft" : "Hidden from shop"}</p>
                 </div>
                 <button
                   className="outline-button"
@@ -971,8 +1000,9 @@ export default function Studio() {
             void save("/api/admin/content", { ...settings, type: "settings" });
           }}
         >
-          <h2>The little details of your site</h2>
-          {(Object.keys(defaultSettings) as (keyof SiteSettings)[]).filter((k) => !siteImages.some((image) => image.key === k)).map((k) => (
+          <h2>Draft site content</h2><p>These changes stay private until you publish the shop from Shop setup.</p>
+          {(Object.keys(defaultSettings) as (keyof SiteSettings)[]).filter((k) => !siteImages.some((image) => image.key === k)
+            && k !== "storyBackgroundImage" && k !== "storyImage").map((k) => (
             <div className="field" key={k}>
               <label htmlFor={`settings-${k}`}>
                 {k.replace(/([A-Z])/g, " $1")}
@@ -1030,7 +1060,7 @@ export default function Studio() {
             ))}
           </div>
           <button className="stitch-button" disabled={busy}>
-            <Save size={16} /> Save site content
+            <Save size={16} /> Save draft content
           </button>
         </form>
       )}

@@ -15,4 +15,13 @@ test("Supabase product rows keep the existing storefront shape", () => {
   assert.equal(result.packedWeightGrams, 180);
   assert.deepEqual(result.gallery, ["first", "second"]);
   assert.deepEqual(result.colors, ["#f7efdf"]);
+  assert.deepEqual(result.categories, ["Keychains & Charms"]);
+});
+
+test("Supabase product rows preserve all selected categories", () => {
+  const result = mapStoreProduct({
+    slug: "bunny", name: "Strawberry bunny", category: "Keychains & Charms",
+    categories: ["Keychains & Charms", "Gifts"],
+  });
+  assert.deepEqual(result.categories, ["Keychains & Charms", "Gifts"]);
 });

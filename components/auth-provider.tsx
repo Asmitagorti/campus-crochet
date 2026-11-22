@@ -10,7 +10,7 @@ type AuthState = {
   ready: boolean;
   admin: boolean;
   error: string;
-  login: (destination?: "/admin" | "/vote") => Promise<void>;
+  login: (destination?: "/admin" | "/vote" | "/checkout") => Promise<void>;
   logout: () => Promise<void>;
   token: () => Promise<string>;
 };
@@ -87,9 +87,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     });
     return () => { subscription.unsubscribe(); generation.current++; };
   }, [sync]);
-  async function login(destination?: "/admin" | "/vote") {
+  async function login(destination?: "/admin" | "/vote" | "/checkout") {
     setError("");
-    sessionStorage.setItem("campus-after-google", destination || "/account");
+    sessionStorage.setItem("campus-after-google", destination === "/checkout"
+      ? `/checkout${window.location.pathname === "/checkout" ? window.location.search : ""}`
+      : destination || "/account");
     const { error: authError } = await browserDatabase().auth.signInWithOAuth({
       provider: "google",
       options: {

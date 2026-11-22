@@ -15,6 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 import { categories, photo, money } from "@/lib/catalog";
+import { belongsToCategory, productCategoryNames, visibleCategoryGroups } from "@/lib/product-categories";
 import { Yarn, Sprig, Title } from "@/components/design";
 import { useShop } from "@/components/site-shell";
 const reveal = {
@@ -30,11 +31,12 @@ export default function Home() {
     [category, setCategory] = useState("All"),
     [onlyLiked, setOnlyLiked] = useState(false);
   const showAll = false;
+  const availableCategories = visibleCategoryGroups(products, categories.map((item) => item.name));
   const visible = products.filter(
     (p) =>
-      (category === "All" || p.category === category) &&
+      (category === "All" || belongsToCategory(p, category)) &&
       (!onlyLiked || liked.includes(p.id)) &&
-      `${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
+      `${p.name} ${productCategoryNames(p).join(" ")}`.toLowerCase().includes(query.toLowerCase()),
   );
   function browse(name = "All") {
     router.push(
@@ -147,13 +149,13 @@ export default function Home() {
           </div>
         ))}
       </section>
-      <motion.section {...reveal} className="categories section-wrap">
+      {availableCategories.length > 0 && <motion.section {...reveal} className="categories section-wrap">
         <Sprig className="corner-doodle" />
         <Title sub="Little pieces of happiness, sorted for you.">
           Explore Our Collection
         </Title>
         <div className="category-grid">
-          {categories.map((c, i) => (
+          {availableCategories.map((c, i) => (
             <button
               className="category-card"
               key={c.name}
@@ -163,7 +165,7 @@ export default function Home() {
               }
             >
               <div className="photo-frame">
-                <img src={photo(c.image)} alt={c.name} loading="lazy" />
+                <img src={c.image} alt={c.name} loading="lazy" />
               </div>
               <h3>{c.name}</h3>
               <span className="mini-button">
@@ -172,7 +174,7 @@ export default function Home() {
             </button>
           ))}
         </div>
-      </motion.section>
+      </motion.section>}
       <motion.section
         {...reveal}
         className="featured section-wrap"

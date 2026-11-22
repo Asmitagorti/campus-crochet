@@ -4,10 +4,11 @@ import { Product, products as catalogOrder } from "./catalog";
 import { mapStoreProduct, StoreProductRow } from "./store-product";
 import { defaultSettings, SiteSettings } from "./site-settings";
 import { journal, JournalEntry } from "./journal";
+import { draftProductFromRow, ProductDraftRow } from "./shop-drafts";
 
 export async function loadProducts(includeUnavailable = false): Promise<Product[]> {
   let query = adminDatabase().from("products")
-    .select("product_id,slug,name,category,short_description,full_description,price,stock_quantity,packed_weight_grams,is_available,details,display_colors,revision,product_images(image_url,display_order)")
+    .select("product_id,slug,name,category,categories,short_description,full_description,price,stock_quantity,packed_weight_grams,is_available,details,display_colors,revision,product_images(image_url,display_order)")
     .not("slug", "is", null);
   if (!includeUnavailable) query = query.eq("is_available", true);
   const { data, error } = await query.limit(1000);
@@ -20,14 +21,32 @@ export async function loadProducts(includeUnavailable = false): Promise<Product[
     });
 }
 
+export async function loadDraftProducts(): Promise<Product[]> {
+  const { data, error } = await adminDatabase().from("shop_product_drafts")
+    .select("draft_id,slug,data,revision").order("slug").limit(1000);
+  if (error) throw error;
+  return (data || []).map((row) => draftProductFromRow(row as ProductDraftRow));
+}
+
+export async function loadDraftSettings(): Promise<SiteSettings & { revision: number }> {
+  const { data, error } = await adminDatabase().from("shop_content_drafts")
+    .select("data,revision").eq("key", "settings").single();
+  if (error) throw error;
+  const saved = data.data && typeof data.data === "object" ? data.data as Record<string, unknown> : {};
+  return { ...Object.fromEntries(Object.entries(defaultSettings).map(([key, fallback]) =>
+    [key, typeof saved[key] === "string" ? saved[key] : fallback])) as SiteSettings,
+    revision: data.revision };
+}
+
 export async function inventory() {
   const rows = await loadProducts();
   return Object.fromEntries(rows.map((row) => [row.id, row.stock || 0]));
 }
 
-export async function loadSettings(): Promise<SiteSettings> {
-  const { data, error } = await adminDatabase().from("site_content").select("data").eq("key", "settings").maybeSingle();
+export async function loadSettings(key: "settings" | "poll_settings" = "settings"): Promise<SiteSettings> {
+  const { data, error } = await adminDatabase().from("site_content").select("data").eq("key", key).maybeSingle();
   if (error) throw error;
+  if (!data && key === "poll_settings") return loadSettings("settings");
   const saved = data?.data && typeof data.data === "object" ? data.data as Record<string, unknown> : {};
   return Object.fromEntries(Object.entries(defaultSettings).map(([key, fallback]) => [key, typeof saved[key] === "string" ? saved[key] : fallback])) as SiteSettings;
 }

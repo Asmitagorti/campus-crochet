@@ -14,6 +14,8 @@ import {
 import { useShop } from "./site-shell";
 import { useAuth } from "./auth-provider";
 import { money, maxQuantity } from "@/lib/catalog";
+import { deliveryChargePaise } from "@/lib/delivery-policy";
+import { indianStates } from "@/lib/indian-states";
 type PaymentResult = {
   razorpay_order_id: string;
   razorpay_payment_id: string;
@@ -91,7 +93,14 @@ export default function Checkout({
         .filter((p) => cart[p.id] > 0)
         .map((p) => ({ ...p, quantity: cart[p.id] }));
   const total = items.reduce((s, p) => s + p.price * p.quantity, 0),
+    [name, setName] = useState(""),
+    [phone, setPhone] = useState(""),
     [addressChoice, setAddressChoice] = useState<"Aditya Surampalem" | "Others">("Aditya Surampalem"),
+    [addressLine1, setAddressLine1] = useState(""),
+    [areaStreet, setAreaStreet] = useState(""),
+    [city, setCity] = useState(""),
+    [state, setState] = useState(""),
+    [landmark, setLandmark] = useState(""),
     [deliveryPin, setDeliveryPin] = useState(""),
     [deliveryQuote, setDeliveryQuote] = useState<{ key: string; value: DeliveryQuote } | null>(null),
     [quoteError, setQuoteError] = useState(""),
@@ -105,13 +114,40 @@ export default function Checkout({
   const activeAttempt = user && attempt?.accountId === user.uid ? attempt : null;
   const activeReceipt = user && receiptOwner === user.uid ? receipt : null;
   const itemSignature = JSON.stringify(items.map((item) => [item.id, item.quantity, item.price]));
-  const quoteKey = JSON.stringify([deliveryPin, itemSignature]);
+  const quoteKey = JSON.stringify([deliveryPin, state, itemSignature]);
   const liveQuote = addressChoice === "Others" && deliveryQuote?.key === quoteKey ? deliveryQuote.value : null;
+  const homeFeePaise = deliveryChargePaise(Math.round(total * 100), true);
+  useEffect(() => {
+    setName(user?.displayName || "");
+    setPhone("");
+    setAddressChoice("Aditya Surampalem");
+    setAddressLine1(""); setAreaStreet(""); setCity(""); setState(""); setLandmark(""); setDeliveryPin("");
+    if (!user) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch("/api/checkout/details", {
+          signal: controller.signal,
+          headers: { Authorization: `Bearer ${await token()}` },
+        });
+        if (!response.ok) return;
+        const { details } = await response.json();
+        if (controller.signal.aborted || !details) return;
+        setName(details.name || user.displayName || "");
+        setPhone(details.phone || "");
+        setAddressChoice(details.addressChoice === "Others" ? "Others" : "Aditya Surampalem");
+        setAddressLine1(details.addressLine1 || ""); setAreaStreet(details.areaStreet || "");
+        setCity(details.city || ""); setState(details.state || "");
+        setLandmark(details.landmark || ""); setDeliveryPin(details.deliveryPin || "");
+      } catch { /* Saved details are optional; checkout still works. */ }
+    })();
+    return () => controller.abort();
+  }, [user?.uid, user?.displayName, token]);
   useEffect(() => {
     setDeliveryQuote(null);
     setQuoteError("");
     setQuoting(false);
-    if (addressChoice !== "Others" || !user || !/^[1-9]\d{5}$/.test(deliveryPin) || !items.length) return;
+    if (addressChoice !== "Others" || !user || !state || !/^[1-9]\d{5}$/.test(deliveryPin) || !items.length) return;
     const controller = new AbortController();
     setQuoting(true);
     const timer = setTimeout(async () => {
@@ -119,7 +155,7 @@ export default function Checkout({
         const response = await fetch("/api/delivery/quote", {
           method: "POST", signal: controller.signal,
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
-          body: JSON.stringify({ deliveryPin, items: JSON.parse(itemSignature).map(([id, quantity]: [string, number, number]) => ({ id, quantity })) }),
+          body: JSON.stringify({ deliveryPin, state, items: JSON.parse(itemSignature).map(([id, quantity]: [string, number, number]) => ({ id, quantity })) }),
         });
         const result = await response.json();
         if (!response.ok) throw Error(result.error || "Delivery quote is unavailable.");
@@ -130,7 +166,7 @@ export default function Checkout({
       } finally { if (!controller.signal.aborted) setQuoting(false); }
     }, 350);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [addressChoice, deliveryPin, itemSignature, quoteKey, total, user?.uid, token]);
+  }, [addressChoice, deliveryPin, state, itemSignature, quoteKey, total, user?.uid, token]);
   const key = useRef("");
   const liveUserUid = useRef<string | null>(null);
   liveUserUid.current = user?.uid || null;
@@ -229,7 +265,7 @@ export default function Checkout({
   async function pay(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (addressChoice === "Others" && !liveQuote) {
-      setError("Enter a supported PIN and wait for the delivery quote before paying.");
+      setError("Select your state, enter a matching PIN and wait for the total before paying.");
       return;
     }
     if (!scriptReady || !window.Razorpay) {
@@ -258,6 +294,7 @@ export default function Checkout({
           body: JSON.stringify({
             ...fields,
             consent: fields.consent === "on",
+            saveDetails: fields.saveDetails === "on",
             expectedAmount: addressChoice === "Others" ? liveQuote!.totalPaise : Math.round(total * 100),
             directBuy: !!buy,
             items: items.map((p) => ({ id: p.id, quantity: p.quantity })),
@@ -339,7 +376,7 @@ export default function Checkout({
             </div>
           ))}
           <div className="total-line"><span>Subtotal</span><strong>{money(activeReceipt.subtotalPaise / 100)}</strong></div>
-          <div className="total-line"><span>Delivery</span><strong>{activeReceipt.deliveryPaise ? money(activeReceipt.deliveryPaise / 100) : "Included"}</strong></div>
+          <div className="total-line"><span>Delivery</span><strong>{activeReceipt.deliveryPaise ? money(activeReceipt.deliveryPaise / 100) : "Free"}</strong></div>
           <div className="total-line">
             <strong>Paid total (INR)</strong>
             <strong>{money(activeReceipt.amount / 100)}</strong>
@@ -367,11 +404,9 @@ export default function Checkout({
         }
       />
       <section className="page-heading">
-        <span className="eyebrow">A little closer to yours</span>
-        <h1>
-          A bag full of happy things <span>♡</span>
-        </h1>
-        <p>One thoughtful choice. A whole lot of handmade love.</p>
+        <span className="eyebrow">Final step</span>
+        <h1>Secure checkout</h1>
+        <p>Review your details and total before continuing to Razorpay.</p>
       </section>
       {testMode && (
         <div className="test-mode-banner">
@@ -430,16 +465,16 @@ export default function Checkout({
         items.length > 0 && (
           <div className="checkout-layout">
             <section className="paper-form">
-              <h2>A Little About You</h2>
+              <h2>Contact and delivery details</h2>
               {!user ? (
                 <div className="checkout-signin">
                   <LockKeyhole />
                   <p>
-                    Sign in to place your order and keep it in your account.
+                    Continue with Google to enter your details, save your address and track the order.
                   </p>
                   <button
                     className="google-button"
-                    onClick={() => void login()}
+                    onClick={() => void login("/checkout")}
                   >
                     <span>G</span> Continue with Google
                   </button>
@@ -447,7 +482,7 @@ export default function Checkout({
                 </div>
               ) : (
                 <form onSubmit={pay}>
-                  <p className="form-intro">Signed in as {user.email}</p>
+                  <p className="form-intro">Signed in as {user.email}. Your order confirmation will go to this address.</p>
                   <div className="field">
                     <label htmlFor="checkout-name">Full name *</label>
                     <input
@@ -456,7 +491,8 @@ export default function Checkout({
                       required
                       minLength={2}
                       maxLength={80}
-                      defaultValue={user.displayName || ""}
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
                       autoComplete="name"
                     />
                   </div>
@@ -484,26 +520,41 @@ export default function Checkout({
                       maxLength={10}
                       placeholder="Your 10-digit mobile number"
                       autoComplete="tel"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))}
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="address-choice">Address *</label>
+                    <label htmlFor="address-choice">Delivery option *</label>
                     <select id="address-choice" name="addressChoice" value={addressChoice} onChange={(e) => setAddressChoice(e.target.value as "Aditya Surampalem" | "Others")}>
-                      <option value="Aditya Surampalem">Aditya Surampalem</option>
-                      <option value="Others">Others</option>
+                      <option value="Aditya Surampalem">Aditya Surampalem · Free</option>
+                      <option value="Others">Home delivery · {homeFeePaise ? "₹69" : "Free over ₹499"}</option>
                     </select>
                   </div>
-                  {addressChoice === "Others" && <div className="field">
-                    <label htmlFor="delivery-address">Complete delivery address *</label>
-                    <textarea id="delivery-address" name="deliveryAddress" required minLength={15} maxLength={500} rows={3} placeholder="Building, street, area, city and state" />
-                    <small>Include your flat or house number, street, area, city and state.</small>
-                  </div>}
-                  {addressChoice === "Others" && <div className="field">
-                    <label htmlFor="delivery-pin">Delivery PIN code *</label>
-                    <input id="delivery-pin" name="deliveryPin" inputMode="numeric" autoComplete="postal-code" required pattern="[1-9][0-9]{5}" maxLength={6} value={deliveryPin} onChange={(e) => setDeliveryPin(e.target.value)} placeholder="Six-digit PIN" />
-                    {quoting && <small>Checking the delivery charge…</small>}
-                    {quoteError && <small className="form-error" role="alert">{quoteError}</small>}
-                  </div>}
+                  {addressChoice === "Others" && <>
+                    <div className="field"><label htmlFor="address-line1">Flat or house number, building *</label>
+                      <input id="address-line1" name="addressLine1" required minLength={3} maxLength={120} autoComplete="address-line1" value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} placeholder="Flat 2, Lotus Building" /></div>
+                    <div className="field"><label htmlFor="area-street">Area, street *</label>
+                      <input id="area-street" name="areaStreet" required minLength={3} maxLength={120} autoComplete="address-line2" value={areaStreet} onChange={(e) => setAreaStreet(e.target.value)} placeholder="South Street, Anna Nagar" /></div>
+                    <div className="form-columns">
+                      <div className="field"><label htmlFor="delivery-city">Town or city *</label>
+                        <input id="delivery-city" name="city" required minLength={2} maxLength={80} autoComplete="address-level2" value={city} onChange={(e) => setCity(e.target.value)} /></div>
+                      <div className="field"><label htmlFor="delivery-state">State or union territory *</label>
+                        <select id="delivery-state" name="state" required autoComplete="address-level1" value={state} onChange={(e) => setState(e.target.value)}>
+                          <option value="">Select state</option>
+                          {indianStates.map((item) => <option key={item} value={item}>{item.replace(/^THE /, "").toLowerCase().replace(/\b[a-z]/g, (letter) => letter.toUpperCase())}</option>)}
+                        </select></div>
+                    </div>
+                    <div className="form-columns">
+                      <div className="field"><label htmlFor="delivery-pin">Delivery PIN code *</label>
+                        <input id="delivery-pin" name="deliveryPin" inputMode="numeric" autoComplete="postal-code" required pattern="[1-9][0-9]{5}" maxLength={6} value={deliveryPin} onChange={(e) => setDeliveryPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="Six-digit PIN" />
+                        {quoting && <small>Checking your PIN and total…</small>}
+                        {quoteError && <small className="form-error" role="alert">{quoteError}</small>}
+                      </div>
+                      <div className="field"><label htmlFor="delivery-landmark">Landmark (optional)</label>
+                        <input id="delivery-landmark" name="landmark" maxLength={120} value={landmark} onChange={(e) => setLandmark(e.target.value)} placeholder="Near the park" /></div>
+                    </div>
+                  </>}
                   <div className="honeypot" aria-hidden="true">
                     <input
                       name="website"
@@ -512,6 +563,7 @@ export default function Checkout({
                       aria-label="Website"
                     />
                   </div>
+                  <p className="quiet-note">Orders cannot be cancelled after payment. We do not offer voluntary returns or exchanges. <Link href="/policies#cancellations">Read the store policy</Link>.</p>
                   <label className="consent">
                     <input name="consent" type="checkbox" required />
                     <span>
@@ -519,6 +571,8 @@ export default function Checkout({
                       to fulfil it. <Link href="/privacy">Privacy details</Link>
                     </span>
                   </label>
+                  <label className="consent"><input name="saveDetails" type="checkbox" defaultChecked />
+                    <span>Save my contact and delivery details for next time.</span></label>
                   <button
                     className="stitch-button full-button"
                     disabled={
@@ -533,14 +587,13 @@ export default function Checkout({
                   >
                     {busy
                       ? "Opening secure checkout…"
-                      : addressChoice === "Others" && !liveQuote ? "Enter a supported PIN for delivery" : `Pay ${money((addressChoice === "Others" ? liveQuote!.totalPaise : Math.round(total * 100)) / 100)} with Razorpay`}{" "}
+                      : addressChoice === "Others" && !liveQuote ? "Enter a matching PIN to see total" : `Continue to Razorpay · ${money((addressChoice === "Others" ? liveQuote!.totalPaise : Math.round(total * 100)) / 100)}`}{" "}
                     <LockKeyhole size={16} />
                   </button>
                   <p className="quiet-note">
                     {testMode
                       ? "Test checkout · No real charges"
-                      : "Secure payment handled by Razorpay"}{" "}
-                    · INR
+                      : "Your payment is completed securely by Razorpay. We do not receive your card or UPI details."}
                   </p>
                 </form>
               )}
@@ -570,7 +623,7 @@ export default function Checkout({
               </div>
               <div className="total-line">
                 <span>Delivery</span>
-                <span>{addressChoice === "Others" ? liveQuote ? money(liveQuote.deliveryPaise / 100) : "Enter PIN for quote" : "Included"}</span>
+                <span>{addressChoice === "Others" ? liveQuote ? liveQuote.deliveryPaise ? money(liveQuote.deliveryPaise / 100) : "Free" : homeFeePaise ? "₹69 · confirm PIN" : "Free · confirm PIN" : "Free"}</span>
               </div>
               <div className="total-line grand-total">
                 <strong>Total (INR)</strong>
@@ -579,7 +632,7 @@ export default function Checkout({
               <div className="pickup-note">
                 <MapPin size={20} />
                 <p>
-                  {addressChoice === "Others" ? liveQuote ? `Your delivery charge includes India Post postage and ₹15. Shipping from Kakinada 533001 to ${deliveryPin}.` : "Only PIN codes with a verified India Post quote are available for online payment." : "Delivery in Aditya Surampalem is included."}
+                  {addressChoice === "Others" ? "Home delivery is ₹69 for a cart up to ₹499, and free above ₹499. Select a state and matching Indian PIN before payment." : "Aditya Surampalem delivery is free."}
                 </p>
               </div>
               <Link className="text-link" href="/shop">
