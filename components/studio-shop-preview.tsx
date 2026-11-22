@@ -80,9 +80,9 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         {categories.map((item) => <button type="button" key={item.name} className={category === item.name ? "selected" : ""} onClick={() => setCategory(item.name)}>{item.name} ({item.count})</button>)}</div>
       <div className="shop-preview-grid">{visible.filter((item) => category === "All" || productCategoryNames(item).includes(category)).map((item) => <article key={item.id}>
         <button type="button" className="shop-preview-photo" onClick={() => openProduct(item.id)}><img src={item.gallery[0]} alt={item.name} /></button>
-        <h3>{item.name}</h3><p>{item.note}</p><strong>{money(item.price)}</strong>
+        <h3>{item.name}</h3><p>{item.note}</p><strong>{money(item.price)}</strong><p>Made to order</p>
         <div className="shop-preview-card-actions"><button type="button" className="outline-button" onClick={() => openProduct(item.id)}>View item</button>
-          <button type="button" className="small-button" onClick={() => add(item.id)}>Add to test bag</button></div>
+          <button type="button" className="small-button" onClick={() => { add(item.id); setView("bag"); }}>Add to test bag</button></div>
       </article>)}</div>
       {!visible.length && <p>No items are set to show in the shop yet. Add one in Products.</p>}
     </>}
