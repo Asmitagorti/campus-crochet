@@ -2,6 +2,7 @@ import { adminDatabase } from "@/lib/supabase-admin";
 import { requireAdminAccess } from "@/lib/admin-access";
 import { loadDraftProducts, loadDraftSettings, loadSettings } from "@/lib/store-data";
 import { errorResponse } from "@/lib/forms";
+import { launchReadiness } from "@/lib/launch-readiness";
 
 export const runtime = "nodejs";
 
@@ -22,11 +23,11 @@ export async function GET(request: Request) {
     const db = adminDatabase();
     const [products, settings, orders, messages, journey, draftState, runtimeState, pollRows, pollSettingsRow] = await Promise.all([
       loadDraftProducts(), loadDraftSettings(),
-      allRows("orders", "order_id,receipt_number,total_price,subtotal_paise,postage_paise,delivery_paise,delivery_pin,payment_status,order_status,ordered_at,version,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))", "ordered_at"),
+      allRows("orders", "order_id,receipt_number,total_price,subtotal_paise,postage_paise,delivery_paise,delivery_pin,payment_status,order_status,ordered_at,version,razorpay_payment_id,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))", "ordered_at"),
       allRows("support_tickets", "id,name,email,subject,message,status,created_at", "created_at"),
       db.from("shop_journey_drafts").select("slug,data,published,revision").order("updated_at", { ascending: false }),
       db.from("shop_draft_state").select("dirty,revision,last_published_at").eq("id", true).single(),
-      db.from("site_runtime").select("mode,active_poll_id").eq("id", true).single(),
+      db.from("site_runtime").select("mode,active_poll_id,sale_starts_at,sale_ends_at").eq("id", true).single(),
       db.from("poll_rounds").select("id,title,description,status,created_at,opened_at,closed_at,poll_options(*)")
         .order("created_at", { ascending: false }).limit(30),
       db.from("site_content").select("data,revision").eq("key", "poll_settings").maybeSingle(),
@@ -47,6 +48,9 @@ export async function GET(request: Request) {
       shopDraftDirty: draftState.data.dirty,
       shopDraftRevision: draftState.data.revision,
       shopLastPublishedAt: draftState.data.last_published_at,
+      saleStartsAt: runtimeState.data.sale_starts_at,
+      saleEndsAt: runtimeState.data.sale_ends_at,
+      launchReadiness: launchReadiness(process.env),
       activePollId: runtimeState.data.active_poll_id,
       polls,
       orders: orders.map((row) => {
@@ -61,10 +65,13 @@ export async function GET(request: Request) {
           status: row.payment_status === "captured" ? "paid" : row.order_status === "cancelled" ? "cancelled" : "pending",
           fulfillment: row.order_status,
           version: row.version,
+          paymentId: row.razorpay_payment_id || null,
           customer: { name: customer.name || "", email: customer.email || "", phone: customer.phone || "",
             addressChoice: row.delivery_choice || customer.addressChoice,
             deliveryAddress: row.delivery_address || customer.deliveryAddress,
-            deliveryPin: row.delivery_pin || customer.deliveryPin },
+            deliveryPin: row.delivery_pin || customer.deliveryPin,
+            addressLine1: customer.addressLine1, areaStreet: customer.areaStreet,
+            city: customer.city, state: customer.state, landmark: customer.landmark },
           items: ((row.order_items || []) as { quantity: number; price_at_purchase: number; product_name_at_purchase?: string; products: { name?: string } | null }[])
             .map((item) => ({ name: item.product_name_at_purchase || item.products?.name || "Handmade piece", quantity: Number(item.quantity), price: Number(item.price_at_purchase) })),
           created_at: row.ordered_at,

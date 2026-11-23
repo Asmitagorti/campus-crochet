@@ -7,6 +7,7 @@ import { parseProductCategories, productCategoryNames } from "@/lib/product-cate
 import { JournalEntry } from "@/lib/journal";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
 import { orderProgress } from "@/lib/order-progress";
+import { dispatchWhatsAppUrl } from "@/lib/whatsapp";
 import StudioPolls, { type AdminPoll } from "./studio-polls";
 import StudioAnalytics from "./studio-analytics";
 import StudioShopPreview from "./studio-shop-preview";
@@ -44,6 +45,11 @@ type StudioOrder = {
     name: string;
     email: string;
     phone: string;
+    addressLine1?: string;
+    areaStreet?: string;
+    city?: string;
+    state?: string;
+    landmark?: string;
     addressChoice?: string;
     deliveryAddress?: string;
     deliveryPin?: string;
@@ -51,6 +57,7 @@ type StudioOrder = {
     note?: string;
   };
   items: { name: string; quantity: number; price: number }[];
+  paymentId?: string | null;
   created_at: string;
 };
 type Message = {
@@ -64,6 +71,9 @@ type Message = {
 type Chapter = JournalEntry & { published: boolean; revision: number };
 type StudioData = {
   products: AdminProduct[];
+  saleStartsAt: string | null;
+  saleEndsAt: string | null;
+  launchReadiness: { livePayments: boolean; email: boolean; webhook: boolean; reconciliation: boolean; ready: boolean };
   siteMode: "shop" | "poll";
   shopDraftDirty: boolean;
   shopDraftRevision: number;
@@ -83,6 +93,7 @@ const blank: AdminProduct = {
   category: "",
   categories: [],
   price: 299,
+  discountPrice: null,
   stock: null,
   packedWeightGrams: null,
   description: "",
@@ -400,11 +411,13 @@ export default function Studio() {
           <h3>Visitors currently see: {data.siteMode === "poll" ? data.activePollId ? "the design poll" : "the poll holding page" : "the selling website"}</h3>
           <p>{data.shopDraftDirty ? "You have unpublished shop changes." : "Your saved shop draft matches the last publication."}
             {data.shopLastPublishedAt && ` Last published ${new Date(data.shopLastPublishedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`}</p>
+          <p>{data.saleEndsAt ? `Opening discounts end ${new Date(data.saleEndsAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.` : "Opening discounts start when you first publish the selling website and last one calendar month."}</p>
+          <p>Before public sales: live Razorpay keys {data.launchReadiness.livePayments ? "✓" : "needed"} · order email {data.launchReadiness.email ? "✓" : "needed"} · payment webhook {data.launchReadiness.webhook ? "✓" : "needed"} · recovery job {data.launchReadiness.reconciliation ? "✓" : "needed"}.</p>
           <div className="poll-actions">
             <button type="button" className="outline-button" onClick={() => setTab("products")}>Edit products</button>
             <button type="button" className="outline-button" onClick={() => setTab("settings")}>Edit site content</button>
             <button type="button" className="outline-button" onClick={() => setTab("journey")}>Edit journey</button>
-            {data.siteMode === "poll" && <button type="button" className="stitch-button" disabled={busy} onClick={async () => {
+            {data.siteMode === "poll" && <button type="button" className="stitch-button" disabled={busy || !data.launchReadiness.ready} onClick={async () => {
               if (!window.confirm("Publish this shop draft, show the selling website to everyone, and allow real payments?")) return;
               if (await save("/api/admin/mode", { action: "shop", draftRevision: data.shopDraftRevision }))
                 window.dispatchEvent(new CustomEvent("campus-mode-changed", { detail: "shop" }));
@@ -413,7 +426,8 @@ export default function Studio() {
           </div>
         </div>
         <StudioShopPreview products={data.products} settings={data.settings} journey={data.journey}
-          email={user.email || ""} token={token} />
+          email={user.email || ""} token={token}
+          saleActive={!data.saleStartsAt || (!!data.saleEndsAt && new Date(data.saleEndsAt).getTime() > Date.now())} />
       </section>}
       {tab === "products" &&
         (editing ? (
@@ -495,7 +509,7 @@ export default function Studio() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="price">Price (INR ₹)</label>
+                <label htmlFor="price">Regular price (INR ₹)</label>
                 <input
                   id="price"
                   type="number"
@@ -507,6 +521,13 @@ export default function Studio() {
                     setEditing({ ...editing, price: Number(e.target.value) })
                   }
                 />
+              </div>
+              <div className="field">
+                <label htmlFor="discount-price">Opening discounted price (optional)</label>
+                <input id="discount-price" type="number" min={1} max={Math.max(1, editing.price - 1)} step={1}
+                  value={editing.discountPrice ?? ""}
+                  onChange={(event) => setEditing({ ...editing, discountPrice: event.target.value ? Number(event.target.value) : null })} />
+                <small>Must be lower than the regular price. It appears after you publish and ends one month after the first shop launch.</small>
               </div>
             </div>
             <div className="field">
@@ -670,7 +691,7 @@ export default function Studio() {
                       {productCategoryNames(p).join(", ")} · {p.active ? "In shop draft" : "Hidden from shop"}
                     </span>
                   </div>
-                  <strong>{money(p.price)}</strong>
+                  <strong>{p.discountPrice ? <><del>{money(p.price)}</del> {money(p.discountPrice)}</> : money(p.price)}</strong>
                   <span>Made to order</span>
                   <button
                     className="outline-button"
@@ -691,9 +712,9 @@ export default function Studio() {
         <section>
           <h2>Delivery pricing</h2>
           <div className="paper-form studio-editor">
-            <p>Aditya Surampalem delivery is free. Home delivery anywhere in India is <strong>₹69</strong> when the cart subtotal is ₹499 or less. A cart subtotal <strong>above ₹499</strong> gets free home delivery.</p>
+            <p><strong>Shipping is free</strong> for Aditya Surampalem and home delivery. Customers still enter a complete address and matching PIN for home delivery.</p>
             <p>Customers choose a state and enter a matching Indian PIN. Checkout shows the final total before opening Razorpay. No rate or product weight setup is needed.</p>
-            <p className="quiet-note">These prices are set in the shop’s delivery policy. The old PIN and weight rates are kept in the database as history but are not used.</p>
+            <p className="quiet-note">The shop pays shipping costs. Old PIN and weight rates remain in the database as history but are not charged.</p>
           </div>
         </section>
       )}
@@ -708,7 +729,7 @@ export default function Studio() {
             <label>Search order or customer<input type="search" value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} placeholder="ID, name or email" /></label>
             <label>Date<input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></label>
             <label>Payment<select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}><option value="all">All</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="cancelled">Cancelled</option></select></label>
-            <label>Fulfillment<select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)}><option value="all">All</option><option value="payment_received">Payment received</option><option value="yarn_selected">Yarn selected</option><option value="crocheting">Crocheting</option><option value="quality_check">Quality check</option><option value="ready">Ready</option><option value="completed">Completed</option><option value="collected">Collected</option></select></label>
+            <label>Fulfillment<select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)}><option value="all">All</option><option value="payment_received">Payment received</option><option value="yarn_selected">Yarn selected</option><option value="crocheting">Crocheting</option><option value="quality_check">Quality check</option><option value="ready">Ready</option><option value="completed">Ready to send</option><option value="dispatched">Dispatched</option><option value="collected">Collected</option></select></label>
           </div>
           {!data?.orders.length && (
             <p className="loading-note">
@@ -735,10 +756,16 @@ export default function Studio() {
               <details className="order-details"><summary>View order details</summary>
                 <p>Mobile: {o.customer.phone}</p>
                 <p>Delivery: {o.customer.addressChoice || o.customer.pickup || "Not recorded"}{o.customer.deliveryAddress ? ` · ${o.customer.deliveryAddress}` : ""}{o.customer.deliveryPin ? ` · ${o.customer.deliveryPin}` : ""}</p>
+                {o.customer.addressLine1 && <p>Flat / building: {o.customer.addressLine1}</p>}
+                {o.customer.areaStreet && <p>Area / street: {o.customer.areaStreet}</p>}
+                {o.customer.city && <p>Town / city: {o.customer.city}</p>}
+                {o.customer.state && <p>State: {o.customer.state}</p>}
+                {o.customer.landmark && <p>Landmark: {o.customer.landmark}</p>}
                 {o.items.map((i, index) => <p key={index}>{i.name} × {i.quantity} · {money(i.price * i.quantity)}</p>)}
                 <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery charge: {money(o.deliveryPaise / 100)} · Paid total: {money(o.amount / 100)}</p>
+                {o.paymentId && <p>Razorpay payment: {o.paymentId}</p>}
               </details>
-              {o.status === "paid" && (
+              {o.status === "paid" && !["dispatched", "collected"].includes(o.fulfillment || "") && (
                 <label className="field">
                   Fulfilment
                   <select
@@ -757,11 +784,14 @@ export default function Studio() {
                     <option value="crocheting">Crocheting</option>
                     <option value="quality_check">Quality check</option>
                     <option value="ready">Ready</option>
-                    <option value="completed">Completed</option>
-                    <option value="collected">Collected</option>
+                    <option value="completed">Finished / ready to send</option>
+                    {o.customer.addressChoice === "Others" && <option value="dispatched">Dispatched</option>}
+                    {o.customer.addressChoice !== "Others" && <option value="collected">Collected</option>}
                   </select>
                 </label>
               )}
+              {o.fulfillment === "dispatched" && dispatchWhatsAppUrl(o.customer.phone, o.receipt) &&
+                <a className="outline-button" href={dispatchWhatsAppUrl(o.customer.phone, o.receipt)!} target="_blank" rel="noopener noreferrer">Open WhatsApp dispatch message</a>}
             </article>
           ))}
         </section>

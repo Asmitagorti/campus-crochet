@@ -26,3 +26,11 @@ test("Supabase product rows preserve all selected categories", () => {
   });
   assert.deepEqual(result.categories, ["Keychains & Charms", "Gifts"]);
 });
+
+test("published opening discount appears only during the sale", () => {
+  const row = { slug: "bunny", name: "Bunny", price: 599, discount_price: 499, is_available: true };
+  assert.equal(mapStoreProduct(row, true).price, 499);
+  assert.equal(mapStoreProduct(row, true).regularPrice, 599);
+  assert.equal(mapStoreProduct(row, false).price, 599);
+  assert.equal(mapStoreProduct(row, false).regularPrice, null);
+});

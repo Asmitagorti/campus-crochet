@@ -19,6 +19,7 @@ test("confirmation includes the order facts and escapes customer data", () => {
     assert.ok(email.text.includes(detail));
   assert.ok(email.html.includes("Asha &lt;Rao&gt;"));
   assert.ok(!email.html.includes("<Card>"));
+  assert.match(email.text, /5–7 working days/i);
 });
 
 test("completion includes status and uses a distinct event key", () => {

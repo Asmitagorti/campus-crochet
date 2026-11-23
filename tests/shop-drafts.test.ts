@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { draftProductFromRow, previewCheckoutTotal } from "../lib/shop-drafts";
+import { draftPreviewProduct, draftProductFromRow, previewCheckoutTotal } from "../lib/shop-drafts";
 
 test("a saved draft product keeps its private catalogue details", () => {
   const result = draftProductFromRow({ draft_id: "sample-id", slug: "blue-bag", revision: 3,
@@ -16,9 +16,15 @@ test("a saved draft product keeps its private catalogue details", () => {
   assert.equal(result.madeToOrder, true);
 });
 
-test("private checkout rehearsal uses the shop delivery threshold and never creates an order", () => {
+test("private checkout rehearsal includes free delivery and the active sale price", () => {
+  const product = draftProductFromRow({ draft_id: "sample-id", slug: "blue-bag", revision: 3,
+    data: { name: "Blue bag", categories: ["Bags"], description: "Handmade bag",
+      price: 550, discountPrice: 450, active: true, gallery: ["first"] } });
+  assert.equal(draftPreviewProduct(product, true).price, 450);
+  assert.equal(draftPreviewProduct(product, false).price, 550);
+  assert.equal(draftPreviewProduct(product, false).regularPrice, null);
   assert.deepEqual(previewCheckoutTotal([{ price: 499, quantity: 1 }], "Others"),
-    { subtotalPaise: 49900, deliveryPaise: 6900, totalPaise: 56800 });
+    { subtotalPaise: 49900, deliveryPaise: 0, totalPaise: 49900 });
   assert.deepEqual(previewCheckoutTotal([{ price: 250, quantity: 2 }], "Others"),
     { subtotalPaise: 50000, deliveryPaise: 0, totalPaise: 50000 });
   assert.deepEqual(previewCheckoutTotal([{ price: 250, quantity: 1 }], "Aditya Surampalem"),

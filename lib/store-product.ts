@@ -1,5 +1,6 @@
 import { Product } from "./catalog";
 import { productCategoryNames } from "./product-categories";
+import { effectiveProductPrice } from "./pricing";
 
 type ImageRow = { image_url?: string; display_order?: number };
 export type StoreProductRow = {
@@ -11,6 +12,7 @@ export type StoreProductRow = {
   short_description?: string;
   full_description?: string;
   price?: number;
+  discount_price?: number | null;
   stock_quantity?: number | null;
   packed_weight_grams?: number | null;
   is_available?: boolean;
@@ -20,7 +22,7 @@ export type StoreProductRow = {
   product_images?: ImageRow[];
 };
 
-export function mapStoreProduct(row: StoreProductRow): Product {
+export function mapStoreProduct(row: StoreProductRow, saleActive = false): Product {
   const details = Array.isArray(row.details) ? row.details.filter((d): d is [string, string] => Array.isArray(d) && d.length === 2 && d.every((v) => typeof v === "string")) : [];
   const categoryNames = productCategoryNames({ category: row.category || "Accessories", categories: row.categories });
   return {
@@ -31,7 +33,7 @@ export function mapStoreProduct(row: StoreProductRow): Product {
     categories: categoryNames,
     note: row.short_description || "",
     description: row.full_description || "",
-    price: Number(row.price || 0),
+    ...effectiveProductPrice(Number(row.price || 0), row.discount_price == null ? null : Number(row.discount_price), saleActive),
     stock: null,
     packedWeightGrams: row.packed_weight_grams == null ? null : Number(row.packed_weight_grams),
     madeToOrder: true,

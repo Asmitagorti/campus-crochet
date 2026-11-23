@@ -15,7 +15,7 @@ const escape = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&
 export function composeOrderEmail(kind: OrderEmailKind, order: OrderEmailOrder) {
   const completed = kind === "completion";
   const subject = `${completed ? "Order completed" : "Order confirmed"} · ${order.id} · Campus Crochet`;
-  const intro = completed ? "Your order is completed. Thank you for choosing handmade." : "Your payment is confirmed and your order is in our hands.";
+  const intro = completed ? "Your piece is finished and ready to send. Thank you for choosing handmade." : "Your payment is confirmed. Your piece will be made to order and dispatched in 5–7 working days.";
   const lines = order.items.map((item) => `${item.name} × ${item.quantity} · ${rupees(item.price)} each · ${rupees(item.price * item.quantity)}`);
   const showBreakdown = order.subtotalPaise !== undefined || order.deliveryPaise !== undefined;
   const subtotal = rupees((order.subtotalPaise ?? order.totalPaise - (order.deliveryPaise ?? 0)) / 100);

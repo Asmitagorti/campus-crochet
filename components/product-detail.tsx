@@ -25,6 +25,7 @@ import {
 } from "@/lib/catalog";
 import { useShop } from "./site-shell";
 import { ProductCard } from "./product-card";
+import ProductPrice from "./product-price";
 import { Title } from "./design";
 export default function ProductDetail({ product: p }: { product: Product }) {
   const { add, liked, toggleLike, catalog: products } = useShop(),
@@ -108,7 +109,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           </h1>
           <p className="product-tagline">{p.note}.</p>
           <div className="detail-price">
-            {money(p.price)} <span>INR</span>
+            <ProductPrice product={p} /> <span>INR</span>
           </div>
           <div className="stock-label">
             <span />
@@ -186,7 +187,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             </span>
           </div>
           <p className="quiet-note">
-            Aditya Surampalem delivery is free. Home delivery is ₹69 for carts up to ₹499, and free above ₹499.
+            Made to order with free shipping. Dispatch in 5–7 working days.
           </p>
         </section>
       </div>
@@ -253,7 +254,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
                   "Contact us for exact measurements before purchasing",
                 ],
                 ["Availability", availability(p)],
-                ["Delivery", "Aditya Surampalem free; home delivery ₹69, free above ₹499"],
+                ["Delivery", "Free shipping; made to order, dispatched in 5–7 working days"],
               ].map(([key, value]) => (
                 <div key={key}>
                   <dt>{key}</dt>

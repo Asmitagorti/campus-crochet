@@ -2134,3 +2134,11 @@ footer nav {
   object-fit: contain;
   background: var(--paper-light);
 }
+.product-price { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: .35em; }
+.product-price del { color: #78675e; font-size: .8em; font-weight: 500; text-decoration-thickness: 1.5px; }
+.product-price > span { color: #783c27; font-weight: 800; }
+.announcement-running { overflow: hidden; white-space: nowrap; }
+.announcement-track { display: flex; width: max-content; animation: opening-banner 26s linear infinite; }
+.announcement-track span { flex: none; padding-right: 3rem; }
+@keyframes opening-banner { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .announcement-track { animation: none; } .announcement-track span[aria-hidden="true"] { display: none; } }

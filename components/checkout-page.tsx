@@ -14,7 +14,7 @@ import {
 import { useShop } from "./site-shell";
 import { useAuth } from "./auth-provider";
 import { money, maxQuantity } from "@/lib/catalog";
-import { deliveryChargePaise } from "@/lib/delivery-policy";
+import ProductPrice from "./product-price";
 import { indianStates } from "@/lib/indian-states";
 type PaymentResult = {
   razorpay_order_id: string;
@@ -116,7 +116,6 @@ export default function Checkout({
   const itemSignature = JSON.stringify(items.map((item) => [item.id, item.quantity, item.price]));
   const quoteKey = JSON.stringify([deliveryPin, state, itemSignature]);
   const liveQuote = addressChoice === "Others" && deliveryQuote?.key === quoteKey ? deliveryQuote.value : null;
-  const homeFeePaise = deliveryChargePaise(Math.round(total * 100), true);
   useEffect(() => {
     setName(user?.displayName || "");
     setPhone("");
@@ -351,7 +350,7 @@ export default function Checkout({
         <span className="eyebrow">
           {testMode
             ? "A successful test checkout"
-            : "Your little happiness is on its way"}
+            : "Your made-to-order piece is confirmed"}
         </span>
         <h1>
           {testMode
@@ -362,7 +361,7 @@ export default function Checkout({
         <p>
           {testMode
             ? "No real money was charged. This order is recorded in the test shop."
-            : "Your payment is confirmed. Follow this order in your account for updates."}
+            : "Your payment is confirmed. We will make your piece and dispatch it in 5–7 working days. Follow its progress in your account."}
         </p>
         <div className="receipt-paper">
           <span>Keep this little reference</span>
@@ -483,6 +482,7 @@ export default function Checkout({
               ) : (
                 <form onSubmit={pay}>
                   <p className="form-intro">Signed in as {user.email}. Your order confirmation will go to this address.</p>
+                  <p className="quiet-note">Made to order · Free shipping · Dispatch in 5–7 working days after payment confirmation.</p>
                   <div className="field">
                     <label htmlFor="checkout-name">Full name *</label>
                     <input
@@ -529,7 +529,7 @@ export default function Checkout({
                     <label htmlFor="address-choice">Delivery option *</label>
                     <select id="address-choice" name="addressChoice" value={addressChoice} onChange={(e) => setAddressChoice(e.target.value as "Aditya Surampalem" | "Others")}>
                       <option value="Aditya Surampalem">Aditya Surampalem · Free</option>
-                      <option value="Others">Home delivery · {homeFeePaise ? "₹69" : "Free over ₹499"}</option>
+                      <option value="Others">Home delivery · Free</option>
                     </select>
                   </div>
                   {addressChoice === "Others" && <>
@@ -613,7 +613,7 @@ export default function Checkout({
                       </span>
                     )}
                   </div>
-                  <strong>{money(p.price * p.quantity)}</strong>
+                  <strong><ProductPrice product={p} quantity={p.quantity} /></strong>
                 </div>
               ))}
               <div className="total-line">
@@ -622,7 +622,7 @@ export default function Checkout({
               </div>
               <div className="total-line">
                 <span>Delivery</span>
-                <span>{addressChoice === "Others" ? liveQuote ? liveQuote.deliveryPaise ? money(liveQuote.deliveryPaise / 100) : "Free" : homeFeePaise ? "₹69 · confirm PIN" : "Free · confirm PIN" : "Free"}</span>
+                <span>{addressChoice === "Others" && !liveQuote ? "Free · confirm PIN" : "Free"}</span>
               </div>
               <div className="total-line grand-total">
                 <strong>Total (INR)</strong>
@@ -631,7 +631,7 @@ export default function Checkout({
               <div className="pickup-note">
                 <MapPin size={20} />
                 <p>
-                  {addressChoice === "Others" ? "Home delivery is ₹69 for a cart up to ₹499, and free above ₹499. Select a state and matching Indian PIN before payment." : "Aditya Surampalem delivery is free."}
+                  {addressChoice === "Others" ? "Shipping is free. Select a state and matching Indian PIN before payment." : "Aditya Surampalem delivery is free."}
                 </p>
               </div>
               <Link className="text-link" href="/shop">

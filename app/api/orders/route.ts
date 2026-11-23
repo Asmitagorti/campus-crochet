@@ -11,12 +11,15 @@ import { parseCheckoutCustomer } from "@/lib/checkout-validation";
 import { readJsonBody } from "@/lib/request-body";
 import { requireShoppingMode } from "@/lib/site-mode";
 import { saveCheckoutDetails } from "@/lib/saved-checkout";
+import { launchReadiness } from "@/lib/launch-readiness";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     await guard(request);
     await requireShoppingMode();
+    if (!launchReadiness(process.env).ready)
+      throw Error("Public checkout is not ready for real payments. Please contact the studio.");
     const user = await requireUser(request);
     const body = await readJsonBody(request);
     if (body.website) throw Error("Unable to process request.");

@@ -14,9 +14,10 @@ import {
   X,
   Plus,
 } from "lucide-react";
-import { categories, photo, money } from "@/lib/catalog";
+import { categories, photo } from "@/lib/catalog";
 import { belongsToCategory, productCategoryNames, visibleCategoryGroups } from "@/lib/product-categories";
 import { Yarn, Sprig, Title } from "@/components/design";
+import ProductPrice from "@/components/product-price";
 import { useShop } from "@/components/site-shell";
 const reveal = {
   initial: { opacity: 0, y: 22 },
@@ -245,7 +246,7 @@ export default function Home() {
                   {p.name}
                 </button>
                 <p>{p.note}</p>
-                <span className="price-note">{money(p.price)}</span>
+                <span className="price-note"><ProductPrice product={p} /></span>
                 <button className="small-button" onClick={() => add(p.id)}>
                   Add to bag <Plus size={12} />
                 </button>

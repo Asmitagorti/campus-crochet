@@ -32,7 +32,7 @@ export async function gateway<T = Record<string, unknown>>(
   return body as T;
 }
 export function verifySignature(
-  message: string,
+  message: string | Uint8Array<ArrayBuffer>,
   signature: string,
   secret: string,
 ) {

@@ -9,6 +9,8 @@ export type Product = {
   categories?: string[];
   note: string;
   price: number;
+  regularPrice?: number | null;
+  discountPrice?: number | null;
   description: string;
   details: [string, string][];
   colors: string[];

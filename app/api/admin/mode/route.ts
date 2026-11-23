@@ -3,6 +3,7 @@ import { requireAdminAccess } from "@/lib/admin-access";
 import { guard, errorResponse } from "@/lib/forms";
 import { readJsonBody } from "@/lib/request-body";
 import { requireFinalPollMigration } from "@/lib/poll-store";
+import { launchReadiness } from "@/lib/launch-readiness";
 
 export const runtime = "nodejs";
 const isUuid = (value: unknown) => typeof value === "string" && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(value);
@@ -17,6 +18,8 @@ export async function POST(request: Request) {
     if (body.action === "open" && !isUuid(body.roundId)) throw Error("Choose a draft poll.");
     if (body.action === "shop" && (!Number.isInteger(body.draftRevision) || body.draftRevision < 0))
       throw Error("Refresh and review the shop draft before publishing.");
+    if (body.action === "shop" && !launchReadiness(process.env).ready)
+      throw Error("Set up live Razorpay keys, order email, a signed Razorpay webhook and payment recovery before publishing the shop.");
     if (body.action === "open") await requireFinalPollMigration();
     const { data, error } = body.action === "shop"
       ? await adminDatabase().rpc("shop_publish_and_open", { p_expected: body.draftRevision })

@@ -158,7 +158,7 @@ export default function Account() {
                   <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery: {o.deliveryPaise ? money(o.deliveryPaise / 100) : "Free"}</p>
                   <strong>Total: {money(o.amount / 100)}</strong>
                   {o.paymentStatus === "paid" && <ol className="order-progress" aria-label={`Order ${o.id} progress`}>
-                    {["Confirmed", "Preparing", "Completed"].map((stage, index) => <li key={stage} className={progress.step >= index + 1 ? "done" : ""} aria-current={progress.step === index + 1 ? "step" : undefined}>{stage}</li>)}
+                    {["Confirmed", "Making", "Ready to send", o.customer?.addressChoice === "Others" ? "Dispatched" : "Collected"].map((stage, index) => <li key={stage} className={progress.step >= index + 1 ? "done" : ""} aria-current={progress.step === index + 1 ? "step" : undefined}>{stage}</li>)}
                   </ol>}
                   <a href={`mailto:support@campus-crochet.tech?subject=${encodeURIComponent(`Order ${o.id}`)}`}>
                     Ask about this order →

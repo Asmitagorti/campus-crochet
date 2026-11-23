@@ -4,21 +4,23 @@ import type { Product } from "@/lib/catalog";
 import { money } from "@/lib/catalog";
 import type { SiteSettings } from "@/lib/site-settings";
 import { productCategoryNames, visibleCategoryGroups } from "@/lib/product-categories";
-import { previewCheckoutTotal } from "@/lib/shop-drafts";
+import { draftPreviewProduct, previewCheckoutTotal } from "@/lib/shop-drafts";
 import { indianStates } from "@/lib/indian-states";
 import type { JournalEntry } from "@/lib/journal";
+import ProductPrice from "./product-price";
 
 type View = "home" | "shop" | "product" | "bag" | "about" | "journey" | "contact";
 type Quote = { subtotalPaise: number; deliveryPaise: number; totalPaise: number; rehearsal: true };
 
-export default function StudioShopPreview({ products, settings, journey, email, token }: {
+export default function StudioShopPreview({ products, settings, journey, email, token, saleActive }: {
   products: Product[];
   settings: SiteSettings;
   journey: (JournalEntry & { published: boolean })[];
   email: string;
   token: () => Promise<string>;
+  saleActive: boolean;
 }) {
-  const visible = products.filter((product) => product.active);
+  const visible = products.filter((product) => product.active).map((product) => draftPreviewProduct(product, saleActive));
   const [view, setView] = useState<View>("home");
   const [selected, setSelected] = useState(visible[0]?.id || "");
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -55,7 +57,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
     finally { setBusy(false); }
   }
   return <div className="shop-preview">
-    <div className="shop-preview-banner"><strong>Private shop preview</strong><span>Draft changes only · No orders or payments</span></div>
+    <div className="shop-preview-banner"><strong>Private shop preview</strong><span>{visible.some((item) => item.regularPrice != null) ? "Opening month offer · " : ""}Free shipping · Draft changes only · No orders or payments</span></div>
     <nav className="shop-preview-nav" aria-label="Preview pages">
       {(["home", "shop", "bag", "about", "journey", "contact"] as const).map((page) =>
         <button type="button" key={page} className={view === page ? "selected" : ""} onClick={() => setView(page)}>
@@ -71,7 +73,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
       <h3>Featured collection</h3>
       <div className="shop-preview-grid">{visible.slice(0, 6).map((item) => <article key={item.id}>
         <button type="button" className="shop-preview-photo" onClick={() => openProduct(item.id)}><img src={item.gallery[0]} alt={item.name} /></button>
-        <h4>{item.name}</h4><p>{money(item.price)}</p><button type="button" className="outline-button" onClick={() => openProduct(item.id)}>View item</button>
+        <h4>{item.name}</h4><p><ProductPrice product={item} /></p><button type="button" className="outline-button" onClick={() => openProduct(item.id)}>View item</button>
       </article>)}</div>
     </>}
     {view === "shop" && <>
@@ -80,7 +82,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         {categories.map((item) => <button type="button" key={item.name} className={category === item.name ? "selected" : ""} onClick={() => setCategory(item.name)}>{item.name} ({item.count})</button>)}</div>
       <div className="shop-preview-grid">{visible.filter((item) => category === "All" || productCategoryNames(item).includes(category)).map((item) => <article key={item.id}>
         <button type="button" className="shop-preview-photo" onClick={() => openProduct(item.id)}><img src={item.gallery[0]} alt={item.name} /></button>
-        <h3>{item.name}</h3><p>{item.note}</p><strong>{money(item.price)}</strong><p>Made to order</p>
+        <h3>{item.name}</h3><p>{item.note}</p><strong><ProductPrice product={item} /></strong><p>Made to order</p>
         <div className="shop-preview-card-actions"><button type="button" className="outline-button" onClick={() => openProduct(item.id)}>View item</button>
           <button type="button" className="small-button" onClick={() => { add(item.id); setView("bag"); }}>Add to test bag</button></div>
       </article>)}</div>
@@ -91,7 +93,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         <div className="shop-preview-thumbs">{product.gallery.map((url, index) => <button type="button" key={`${url}-${index}`} aria-label={`View photo ${index + 1}`} onClick={() => setPhotoIndex(index)}><img src={url} alt="" /></button>)}</div></div>
       <div><button type="button" className="text-link" onClick={() => setView("shop")}>← Back to shop</button>
         <h2>{product.name}</h2><p>{product.description}</p><p>{productCategoryNames(product).join(" · ")}</p>
-        <strong>{money(product.price)}</strong><p>Made to order</p>
+        <strong><ProductPrice product={product} /></strong><p>Made to order</p>
         <button type="button" className="stitch-button" onClick={() => { add(product.id); setView("bag"); }}>Add to test bag</button></div>
     </div>}
     {view === "bag" && <>
@@ -102,7 +104,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
           <div className="field"><label htmlFor="preview-name">Full name *</label><input id="preview-name" name="name" required minLength={2} maxLength={80} /></div>
           <div className="field"><label htmlFor="preview-phone">Indian mobile number (+91) *</label><input id="preview-phone" name="phone" type="tel" required pattern="(?:[+]91[ -]?)?[6-9](?:[ -]?[0-9]){9}" maxLength={24} placeholder="9876543210 or +91 9876543210" /></div>
           <div className="field"><label htmlFor="preview-choice">Delivery option *</label><select id="preview-choice" value={addressChoice} onChange={(event) => { setAddressChoice(event.target.value as typeof addressChoice); setQuote(null); }}>
-            <option value="Aditya Surampalem">Aditya Surampalem · Free</option><option value="Others">Home delivery · ₹69 up to ₹499, free above</option></select></div>
+            <option value="Aditya Surampalem">Aditya Surampalem · Free</option><option value="Others">Home delivery · Free</option></select></div>
           {addressChoice === "Others" && <>
             <div className="field"><label htmlFor="preview-house">Flat or house number, building *</label><input id="preview-house" name="addressLine1" required minLength={3} maxLength={120} /></div>
             <div className="field"><label htmlFor="preview-street">Area, street *</label><input id="preview-street" name="areaStreet" required minLength={3} maxLength={120} /></div>
@@ -119,7 +121,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         </form>
         <aside className="checkout-summary"><h3>Your test collection</h3>
           {items.map((item) => <div className="checkout-item" key={item.id}><img src={item.gallery[0]} alt={item.name} /><div><strong>{item.name}</strong><p>Quantity {item.quantity}</p>
-            <button type="button" className="text-link" onClick={() => { setBag((current) => { const next = { ...current }; delete next[item.id]; return next; }); setQuote(null); }}>Remove</button></div><strong>{money(item.price * item.quantity)}</strong></div>)}
+            <button type="button" className="text-link" onClick={() => { setBag((current) => { const next = { ...current }; delete next[item.id]; return next; }); setQuote(null); }}>Remove</button></div><strong><ProductPrice product={item} quantity={item.quantity} /></strong></div>)}
           <div className="total-line"><span>Subtotal</span><strong>{money(estimate.subtotalPaise / 100)}</strong></div>
           <div className="total-line"><span>Delivery</span><strong>{estimate.deliveryPaise ? money(estimate.deliveryPaise / 100) : "Free"}</strong></div>
           <div className="total-line grand-total"><strong>Total</strong><strong>{money(estimate.totalPaise / 100)}</strong></div>

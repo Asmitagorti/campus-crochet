@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { Heart, Plus } from "lucide-react";
 import { motion } from "motion/react";
-import { Product, photo, money, availability, canOrder } from "@/lib/catalog";
+import { Product, photo, availability, canOrder } from "@/lib/catalog";
+import ProductPrice from "./product-price";
 import { useShop } from "./site-shell";
 export function ProductCard({
   product: p,
@@ -45,7 +46,7 @@ export function ProductCard({
         {p.name}
       </Link>
       <p>{p.note}</p>
-      <div className="card-price">{money(p.price)}</div>
+      <div className="card-price"><ProductPrice product={p} /></div>
       <span className="price-note">{availability(p)}</span>
       <button
         disabled={!canOrder(p)}

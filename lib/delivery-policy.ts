@@ -1,9 +1,7 @@
-export const homeDeliveryFeePaise = 6900;
-export const freeHomeDeliveryAbovePaise = 49900;
-
 export function deliveryChargePaise(subtotalPaise: number, homeDelivery: boolean): number {
   if (!Number.isSafeInteger(subtotalPaise) || subtotalPaise < 0) throw Error("Invalid order subtotal.");
-  return homeDelivery && subtotalPaise <= freeHomeDeliveryAbovePaise ? homeDeliveryFeePaise : 0;
+  void homeDelivery;
+  return 0;
 }
 
 type QuotedAmounts = {

@@ -1,6 +1,7 @@
 import type { Product } from "./catalog";
 import { deliveryChargePaise } from "./delivery-policy";
 import { productCategoryNames } from "./product-categories";
+import { effectiveProductPrice } from "./pricing";
 
 export type ProductDraftRow = {
   draft_id: string;
@@ -24,6 +25,7 @@ export function draftProductFromRow(row: ProductDraftRow): Product {
     categories,
     description: String(data.description || ""),
     price: Number(data.price || 0),
+    discountPrice: data.discountPrice == null ? null : Number(data.discountPrice),
     stock: null,
     packedWeightGrams: data.packedWeightGrams == null ? null : Number(data.packedWeightGrams),
     active: data.active === true,
@@ -33,6 +35,10 @@ export function draftProductFromRow(row: ProductDraftRow): Product {
     colors: Array.isArray(data.colors) ? data.colors as string[] : [],
     gallery: Array.isArray(data.gallery) ? data.gallery as string[] : [],
   };
+}
+
+export function draftPreviewProduct(product: Product, saleActive = true): Product {
+  return { ...product, ...effectiveProductPrice(product.price, product.discountPrice, saleActive) };
 }
 
 export function previewCheckoutTotal(items: { price: number; quantity: number }[], addressChoice: "Others" | "Aditya Surampalem") {

@@ -1,7 +1,7 @@
 import "server-only";
 import { adminDatabase } from "./supabase-admin";
 import { OrderEmailOrder } from "./order-email";
-import { ResendResponseError, sendOrderEmail } from "./resend";
+import { sendOrderEmail } from "./resend";
 
 type EmailJob = {
   id: string;
@@ -31,9 +31,8 @@ export async function dispatchOrderEmails(limit = 10) {
       sent++;
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 500) : "Email send failed.";
-      const retryable = error instanceof ResendResponseError && [400, 401, 403, 429].includes(error.status);
       await db.from("notification_jobs").update({
-        status: retryable ? "failed" : "sending",
+        status: "failed",
         last_error: message,
         next_attempt_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       }).eq("id", job.id).eq("status", "sending");

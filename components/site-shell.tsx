@@ -23,6 +23,7 @@ import { products, getProduct, photo, money, maxQuantity } from "@/lib/catalog";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
 import type { SiteMode } from "@/lib/site-mode";
 import { Yarn } from "./design";
+import ProductPrice from "./product-price";
 type ShopState = {
   cart: Record<string, number>;
   liked: string[];
@@ -299,10 +300,18 @@ export default function SiteShell({
           <a href="#main-content" className="skip-link">
             Skip to content
           </a>
-          <div className="announcement">
-            A little yarn. A lot of love. <Heart size={11} />{" "}
-            {settings.announcement}
-          </div>
+          {mode === "shop" ? <div className="announcement announcement-running" aria-label={catalog.some((product) => product.regularPrice != null)
+            ? "Opening month offer. Special prices on selected pieces. Free shipping on every order."
+            : "Free shipping on every order. Each piece is made to order."}>
+            <div className="announcement-track">
+              <span>{catalog.some((product) => product.regularPrice != null)
+                ? "Opening month offer ✦ Special prices on selected pieces ✦ Free shipping on every order ✦ Made to order ✦"
+                : "Free shipping on every order ✦ Made to order ✦ Dispatch in 5–7 working days ✦"}</span>
+              <span aria-hidden="true">{catalog.some((product) => product.regularPrice != null)
+                ? "Opening month offer ✦ Special prices on selected pieces ✦ Free shipping on every order ✦ Made to order ✦"
+                : "Free shipping on every order ✦ Made to order ✦ Dispatch in 5–7 working days ✦"}</span>
+            </div>
+          </div> : <div className="announcement">A little yarn. A lot of love. <Heart size={11} /> {settings.announcement}</div>}
           <header>
             <Link className="brand" href="/" aria-label="Campus-Crochet home">
               <Yarn />
@@ -497,7 +506,7 @@ export default function SiteShell({
                               >
                                 <h3>{p.name}</h3>
                               </Link>
-                              <p>{money(p.price)}</p>
+                              <p><ProductPrice product={p} /></p>
                               <div className="quantity">
                                 <button
                                   aria-label={`Remove one ${p.name}`}
@@ -536,7 +545,7 @@ export default function SiteShell({
                         <strong>Subtotal</strong>
                         <strong>{money(total)}</strong>
                       </div>
-                      <p>Aditya Surampalem delivery is free. Home delivery is ₹69, or free when your bag is above ₹499.</p>
+                      <p>Shipping is free for every order. Each piece is made after you order.</p>
                       <Link
                         className="stitch-button full-button"
                         href="/checkout"
