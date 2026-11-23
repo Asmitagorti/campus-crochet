@@ -613,7 +613,7 @@ export default function Checkout({
                       </span>
                     )}
                   </div>
-                  <strong><ProductPrice product={p} quantity={p.quantity} /></strong>
+                  <strong><ProductPrice product={p} quantity={p.quantity} showSavings={false} /></strong>
                 </div>
               ))}
               <div className="total-line">

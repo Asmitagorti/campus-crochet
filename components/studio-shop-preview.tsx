@@ -93,7 +93,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         <div className="shop-preview-thumbs">{product.gallery.map((url, index) => <button type="button" key={`${url}-${index}`} aria-label={`View photo ${index + 1}`} onClick={() => setPhotoIndex(index)}><img src={url} alt="" /></button>)}</div></div>
       <div><button type="button" className="text-link" onClick={() => setView("shop")}>← Back to shop</button>
         <h2>{product.name}</h2><p>{product.description}</p><p>{productCategoryNames(product).join(" · ")}</p>
-        <strong><ProductPrice product={product} /></strong><p>Made to order</p>
+        <div className="detail-price"><ProductPrice product={product} /></div><p>Made to order</p>
         <button type="button" className="stitch-button" onClick={() => { add(product.id); setView("bag"); }}>Add to test bag</button></div>
     </div>}
     {view === "bag" && <>
@@ -121,7 +121,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
         </form>
         <aside className="checkout-summary"><h3>Your test collection</h3>
           {items.map((item) => <div className="checkout-item" key={item.id}><img src={item.gallery[0]} alt={item.name} /><div><strong>{item.name}</strong><p>Quantity {item.quantity}</p>
-            <button type="button" className="text-link" onClick={() => { setBag((current) => { const next = { ...current }; delete next[item.id]; return next; }); setQuote(null); }}>Remove</button></div><strong><ProductPrice product={item} quantity={item.quantity} /></strong></div>)}
+            <button type="button" className="text-link" onClick={() => { setBag((current) => { const next = { ...current }; delete next[item.id]; return next; }); setQuote(null); }}>Remove</button></div><strong><ProductPrice product={item} quantity={item.quantity} showSavings={false} /></strong></div>)}
           <div className="total-line"><span>Subtotal</span><strong>{money(estimate.subtotalPaise / 100)}</strong></div>
           <div className="total-line"><span>Delivery</span><strong>{estimate.deliveryPaise ? money(estimate.deliveryPaise / 100) : "Free"}</strong></div>
           <div className="total-line grand-total"><strong>Total</strong><strong>{money(estimate.totalPaise / 100)}</strong></div>

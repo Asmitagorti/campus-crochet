@@ -213,7 +213,6 @@ header nav a[aria-current="page"] {
   display: block;
 }
 .card-price {
-  font-size: 15px;
   font-weight: 700;
   margin: 6px 0 1px;
 }
@@ -512,15 +511,7 @@ button:disabled {
   color: var(--muted);
 }
 .detail-price {
-  font-size: 28px;
-  font-weight: 700;
   margin: 18px 0 10px;
-}
-.detail-price > span {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 400;
-  margin-left: 5px;
 }
 .stock-label {
   font-size: 11px;
@@ -1349,6 +1340,7 @@ input[type="checkbox"] {
 }
 .checkout-item > div {
   flex: 1;
+  min-width: 0;
 }
 .checkout-item > div > a {
   font-weight: 600;
@@ -1359,8 +1351,9 @@ input[type="checkbox"] {
   margin-top: 5px;
 }
 .checkout-item > strong {
-  font-size: 12px;
-  white-space: nowrap;
+  flex: 0 1 auto;
+  max-width: 48%;
+  text-align: right;
 }
 .grand-total {
   font-size: 18px;

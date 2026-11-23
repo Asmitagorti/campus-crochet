@@ -506,7 +506,7 @@ export default function SiteShell({
                               >
                                 <h3>{p.name}</h3>
                               </Link>
-                              <p><ProductPrice product={p} /></p>
+                              <p><ProductPrice product={p} showSavings={false} /></p>
                               <div className="quantity">
                                 <button
                                   aria-label={`Remove one ${p.name}`}

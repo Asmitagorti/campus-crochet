@@ -109,7 +109,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           </h1>
           <p className="product-tagline">{p.note}.</p>
           <div className="detail-price">
-            <ProductPrice product={p} /> <span>INR</span>
+            <ProductPrice product={p} />
           </div>
           <div className="stock-label">
             <span />
