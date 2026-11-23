@@ -25,7 +25,7 @@ export default function ProductPrice({
         </span>
       )}
       {isDiscounted && showSavings && discountPercent > 0 && (
-        <span className="product-price__saving">{discountPercent}% off</span>
+        <span className="product-price__saving">({discountPercent}% OFF)</span>
       )}
     </span>
   );
