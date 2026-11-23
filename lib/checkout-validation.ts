@@ -38,7 +38,7 @@ export function parseCheckoutCustomer(body: Record<string, unknown>, registeredE
     const state = addressField(body, "state", "state", 2, 80);
     const landmark = addressField(body, "landmark", "landmark", 0, 120);
     const deliveryPin = typeof body.deliveryPin === "string" ? body.deliveryPin.trim() : "";
-    validateDestination(deliveryPin, state);
+    validateDestination(deliveryPin, state, city);
     const deliveryAddress = [addressLine1, areaStreet, city, state, landmark].filter(Boolean).join(", ");
     return { name, email: registeredEmail, phone, addressChoice: "Others", deliveryAddress,
       deliveryPin, addressLine1, areaStreet, city, state, landmark };

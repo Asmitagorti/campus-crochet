@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@devzoy/indian-pincode": "2.1.0",
+    "@devzoy/indian-pincode-geo": "2.1.0",
     "@fontsource/caveat": "^5.3.0",
     "@fontsource/nunito-sans": "^5.3.0",
     "@opentelemetry/api": "^1.10.0",

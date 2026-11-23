@@ -17,7 +17,8 @@ export async function POST(request: Request) {
     const body = await readJsonBody(request);
     const pin = typeof body.deliveryPin === "string" ? body.deliveryPin.trim() : "";
     const state = typeof body.state === "string" ? body.state.trim() : "";
-    validateDestination(pin, state);
+    const city = typeof body.city === "string" ? body.city.trim() : "";
+    validateDestination(pin, state, city);
     const items = resolveCheckoutItems(body.items, await loadProducts());
     const quote = await quoteDelivery(items, pin);
     return Response.json(quote, { headers: { "Cache-Control": "no-store" } });

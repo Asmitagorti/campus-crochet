@@ -114,7 +114,7 @@ export default function Checkout({
   const activeAttempt = user && attempt?.accountId === user.uid ? attempt : null;
   const activeReceipt = user && receiptOwner === user.uid ? receipt : null;
   const itemSignature = JSON.stringify(items.map((item) => [item.id, item.quantity, item.price]));
-  const quoteKey = JSON.stringify([deliveryPin, state, itemSignature]);
+  const quoteKey = JSON.stringify([deliveryPin, state, city.trim(), itemSignature]);
   const liveQuote = addressChoice === "Others" && deliveryQuote?.key === quoteKey ? deliveryQuote.value : null;
   useEffect(() => {
     setName(user?.displayName || "");
@@ -146,7 +146,7 @@ export default function Checkout({
     setDeliveryQuote(null);
     setQuoteError("");
     setQuoting(false);
-    if (addressChoice !== "Others" || !user || !state || !/^[1-9]\d{5}$/.test(deliveryPin) || !items.length) return;
+    if (addressChoice !== "Others" || !user || !state || city.trim().length < 2 || !/^[1-9]\d{5}$/.test(deliveryPin) || !items.length) return;
     const controller = new AbortController();
     setQuoting(true);
     const timer = setTimeout(async () => {
@@ -154,7 +154,7 @@ export default function Checkout({
         const response = await fetch("/api/delivery/quote", {
           method: "POST", signal: controller.signal,
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
-          body: JSON.stringify({ deliveryPin, state, items: JSON.parse(itemSignature).map(([id, quantity]: [string, number, number]) => ({ id, quantity })) }),
+          body: JSON.stringify({ deliveryPin, state, city: city.trim(), items: JSON.parse(itemSignature).map(([id, quantity]: [string, number, number]) => ({ id, quantity })) }),
         });
         const result = await response.json();
         if (!response.ok) throw Error(result.error || "Delivery quote is unavailable.");
@@ -165,7 +165,7 @@ export default function Checkout({
       } finally { if (!controller.signal.aborted) setQuoting(false); }
     }, 350);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [addressChoice, deliveryPin, state, itemSignature, quoteKey, total, user?.uid, token]);
+  }, [addressChoice, deliveryPin, state, city, itemSignature, quoteKey, total, user?.uid, token]);
   const key = useRef("");
   const liveUserUid = useRef<string | null>(null);
   liveUserUid.current = user?.uid || null;
@@ -264,7 +264,7 @@ export default function Checkout({
   async function pay(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (addressChoice === "Others" && !liveQuote) {
-      setError("Select your state, enter a matching PIN and wait for the total before paying.");
+      setError("Enter a town, state and matching PIN, then wait for the total before paying.");
       return;
     }
     if (!scriptReady || !window.Razorpay) {
@@ -631,7 +631,7 @@ export default function Checkout({
               <div className="pickup-note">
                 <MapPin size={20} />
                 <p>
-                  {addressChoice === "Others" ? "Shipping is free. Select a state and matching Indian PIN before payment." : "Aditya Surampalem delivery is free."}
+                  {addressChoice === "Others" ? "Shipping is free. Enter a town, state and matching Indian PIN before payment." : "Aditya Surampalem delivery is free."}
                 </p>
               </div>
               <Link className="text-link" href="/shop">

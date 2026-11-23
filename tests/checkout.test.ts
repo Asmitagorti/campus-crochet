@@ -42,5 +42,15 @@ test("PIN must exist and match the chosen Indian state", () => {
   assert.throws(() => parseCheckoutCustomer({ ...home, state: "DELHI" }, "asha@gmail.com"), /state/i);
   assert.throws(() => parseCheckoutCustomer({ ...home, deliveryPin: "999999" }, "asha@gmail.com"), /PIN/i);
   assert.throws(() => parseCheckoutCustomer({ ...home, deliveryPin: "60001" }, "asha@gmail.com"), /PIN/i);
-  assert.equal(parseCheckoutCustomer({ ...home, state: "DELHI", deliveryPin: "110001" }, "asha@gmail.com").state, "DELHI");
+  assert.equal(parseCheckoutCustomer({ ...home, city: "New Delhi", state: "DELHI", deliveryPin: "110001" }, "asha@gmail.com").state, "DELHI");
+});
+
+test("home delivery PIN must match the entered town or city", () => {
+  assert.throws(() => parseCheckoutCustomer({ ...home, city: "Coimbatore" }, "asha@gmail.com"), /town|city/i);
+  assert.equal(parseCheckoutCustomer({ ...home, city: "  chennai " }, "asha@gmail.com").city, "chennai");
+  assert.equal(parseCheckoutCustomer({ ...home, city: "Flower Bazaar" }, "asha@gmail.com").city, "Flower Bazaar");
+  assert.equal(parseCheckoutCustomer({ ...home, city: "Cyberabad", state: "TELANGANA", deliveryPin: "500081" }, "asha@gmail.com").city, "Cyberabad");
+  assert.equal(parseCheckoutCustomer({ ...home, city: "Bangalore", state: "KARNATAKA", deliveryPin: "560001" }, "asha@gmail.com").city, "Bangalore");
+  assert.equal(parseCheckoutCustomer({ ...home, city: "Delhi", state: "DELHI", deliveryPin: "110025" }, "asha@gmail.com").city, "Delhi");
+  assert.throws(() => parseCheckoutCustomer({ ...home, city: "Budaun", state: "DELHI", deliveryPin: "110025" }, "asha@gmail.com"), /town|city/i);
 });
