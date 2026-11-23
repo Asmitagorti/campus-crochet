@@ -3,6 +3,9 @@ const config: NextConfig = {
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   turbopack: { root: process.cwd() },
   outputFileTracingRoot: process.cwd(),
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/@devzoy/indian-pincode-geo/data/records.json.gz"],
+  },
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   async headers() {
