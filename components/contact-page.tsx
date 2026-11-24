@@ -7,9 +7,11 @@ import {
   ArrowRight,
   Heart,
   Check,
+  Instagram,
 } from "lucide-react";
 import { useShop } from "./site-shell";
 import { Sprig } from "./design";
+import { instagramHandle, instagramUrl } from "@/lib/social";
 const topics = [
   "A product question",
   "My order",
@@ -74,6 +76,14 @@ export default function Contact() {
             <div>
               <strong>Customer support</strong>
               <span>support@campus-crochet.tech</span>
+            </div>
+            <ArrowRight size={17} />
+          </a>
+          <a className="contact-method" href={instagramUrl} target="_blank" rel="noopener noreferrer">
+            <Instagram />
+            <div>
+              <strong>Follow us on Instagram</strong>
+              <span>{instagramHandle}</span>
             </div>
             <ArrowRight size={17} />
           </a>

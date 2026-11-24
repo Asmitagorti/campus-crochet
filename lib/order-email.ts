@@ -19,6 +19,8 @@ export function parseEmailKind(value: unknown): EmailKind {
   throw Error("Choose a valid email type.");
 }
 
+const trackingReminder = "You can track your order as I make and dispatch it. Check your profile regularly for updates at [campus-crochet.tech/account](https://campus-crochet.tech/account).";
+
 export const defaultOrderEmailTemplate: OrderEmailTemplate = {
   subject: "Yay! Your Campus Crochet order is confirmed! 🧶",
   body: `Hii {user_name}!
@@ -35,6 +37,8 @@ A little note from me: I'm currently pursuing my B.Tech while running this littl
 
 Thank you so much for supporting my small business and choosing something handmade. I can't wait for you to receive your order!
 
+${trackingReminder}
+
 If you have any questions along the way, feel free to reach out at [support@campus-crochet.tech](mailto:support@campus-crochet.tech).
 
 With love and a little bit of yarn,
@@ -43,6 +47,15 @@ Founder & Maker, Campus Crochet 🧶
 
 [campus-crochet.tech](https://campus-crochet.tech)`,
 };
+
+export function withOrderTrackingReminder(template: OrderEmailTemplate): OrderEmailTemplate {
+  if (template.body.includes("https://campus-crochet.tech/account")) return template;
+  const signature = /\n\nWith love/i;
+  const body = signature.test(template.body)
+    ? template.body.replace(signature, `\n\n${trackingReminder}\n\nWith love`)
+    : `${template.body.trimEnd()}\n\n${trackingReminder}`;
+  return { ...template, body };
+}
 
 export const defaultShippingEmailTemplate: OrderEmailTemplate = {
   subject: "Your Campus Crochet order is on its way! 🧶📦",
@@ -153,6 +166,7 @@ function renderBodyText(body: string, order: OrderEmailOrder, details?: Shipping
 }
 
 export function composeOrderEmail(order: OrderEmailOrder, template: OrderEmailTemplate = defaultOrderEmailTemplate) {
+  template = withOrderTrackingReminder(template);
   const subject = fillPlaceholders(template.subject, order, false);
   const text = renderBodyText(template.body, order);
   const html = `<div style="font-family:Arial,sans-serif;line-height:1.65;max-width:620px;margin:auto;color:#352b31;padding:20px">${renderBodyHtml(template.body, order)}</div>`;

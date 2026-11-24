@@ -78,6 +78,7 @@ function EmailEditor({ kind, title, help }: (typeof editors)[number]) {
           <textarea id={`email-${kind}-body`} required rows={kind === "confirmation" ? 22 : 18} maxLength={10000} value={template.body}
             onChange={(event) => { setTemplate({ ...template, body: event.target.value }); setNotice(""); }} /></div>
         <p className="quiet-note">Keep <code>{"{user_name}"}</code> and <code>{"{item_name}"}</code>. Item names appear in bold. {kind === "shipping" && <>Also keep <code>{"{courier_name}"}</code> and <code>{"{tracking_id}"}</code>.</>} Use <code>**words**</code> for other bold text.</p>
+        {kind === "confirmation" && <p className="quiet-note">Every confirmation includes a reminder to check the order in the customer profile. You can see it in the preview below.</p>}
         {kind === "received" && <p className="quiet-note">Add your exact Instagram @username to this message when you have it.</p>}
         <div className="studio-email-actions">
           <button className="stitch-button" disabled={saving}><Save size={16} /> {saving ? "Saving…" : "Save email"}</button>

@@ -361,7 +361,7 @@ export default function Checkout({
         <p>
           {testMode
             ? "No real money was charged. This order is recorded in the test shop."
-            : "Your payment is confirmed. We will make your piece and dispatch it in 5–7 working days. Follow its progress in your account."}
+            : "Your payment is confirmed. We will make your piece and dispatch it in 5–7 working days."}
         </p>
         <div className="receipt-paper">
           <span>Keep this little reference</span>
@@ -380,11 +380,15 @@ export default function Checkout({
             <strong>Paid total (INR)</strong>
             <strong>{money(activeReceipt.amount / 100)}</strong>
           </div>
-          <p>Delivery location: {activeReceipt.deliveryChoice}{activeReceipt.deliveryAddress ? ` · ${activeReceipt.deliveryAddress}` : ""}{activeReceipt.deliveryPin ? ` · ${activeReceipt.deliveryPin}` : ""}. Check your account for progress.</p>
+          <p>Delivery location: {activeReceipt.deliveryChoice}{activeReceipt.deliveryAddress ? ` · ${activeReceipt.deliveryAddress}` : ""}{activeReceipt.deliveryPin ? ` · ${activeReceipt.deliveryPin}` : ""}.</p>
+          <div className="receipt-tracking">
+            <strong>Track your order in your profile</strong>
+            <p>Check your profile regularly to see each update as your piece is made and dispatched.</p>
+          </div>
         </div>
         <div className="receipt-actions">
           <Link className="stitch-button" href="/account">
-            Your orders <ArrowRight size={15} />
+            Track your order <ArrowRight size={15} />
           </Link>
           <a className="outline-button" href={`mailto:support@campus-crochet.tech?subject=${encodeURIComponent(`Order ${activeReceipt.receipt}`)}`}>Ask support about this order</a>
         </div>

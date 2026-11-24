@@ -23,6 +23,8 @@ test("default confirmation follows Asmita's message and bolds purchased item nam
   assert.match(email.html, /<strong>Flower &lt;Card&gt; × 2<\/strong>/);
   assert.ok(!email.html.includes("<Card>"));
   assert.match(email.html, /mailto:support@campus-crochet\.tech/);
+  assert.match(email.text, /Check your profile regularly for updates/);
+  assert.match(email.html, /href="https:\/\/campus-crochet\.tech\/account"/);
   assert.ok(!email.text.includes("Total paid:"));
   assert.ok(!email.text.includes("Order ID:"));
   assert.equal(email.eventKey, "campus-crochet/confirmation/CC-123");
@@ -41,6 +43,8 @@ test("a saved template is used for later messages and multiple items remain bold
   assert.match(email.text, /Flower <Card> × 2 and Blue hat/);
   assert.match(email.html, /<strong>Flower &lt;Card&gt; × 2 and Blue hat<\/strong>/);
   assert.match(email.html, /<strong>Thank you<\/strong>/);
+  assert.match(email.text, /Check your profile regularly for updates/);
+  assert.equal(email.text.match(/Check your profile regularly for updates/g)?.length, 1);
 });
 
 test("edited email content cannot inject HTML or unsafe links", () => {

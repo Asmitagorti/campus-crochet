@@ -17,11 +17,13 @@ import {
   Plus,
   Check,
   Mail,
+  Instagram,
   UserRound,
 } from "lucide-react";
 import { products, getProduct, photo, money, maxQuantity } from "@/lib/catalog";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
 import type { SiteMode } from "@/lib/site-mode";
+import { instagramHandle, instagramUrl } from "@/lib/social";
 import { Yarn } from "./design";
 import ProductPrice from "./product-price";
 type ShopState = {
@@ -429,6 +431,9 @@ export default function SiteShell({
                 <Yarn />
                 <h2>About Campus Crochet</h2>
                 <p>Handmade crochet pieces shaped with care by a student maker. Little keepsakes, thoughtful gifts and everyday favourites, one stitch at a time.</p>
+                <a href={instagramUrl} target="_blank" rel="noopener noreferrer" aria-label={`Follow Campus Crochet on Instagram ${instagramHandle}`}>
+                  <Instagram size={15} /> {instagramHandle}
+                </a>
               </div>
               <div>
                 <h2>Customer support</h2>

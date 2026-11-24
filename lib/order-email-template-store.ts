@@ -1,6 +1,6 @@
 import "server-only";
 import { adminDatabase } from "./supabase-admin";
-import { defaultEmailTemplates, validateEmailTemplate, type EmailKind } from "./order-email";
+import { defaultEmailTemplates, validateEmailTemplate, withOrderTrackingReminder, type EmailKind } from "./order-email";
 
 export const ORDER_EMAIL_TEMPLATE_KEY = "order_confirmation_template";
 export const EMAIL_TEMPLATE_KEYS: Record<EmailKind, string> = {
@@ -14,7 +14,9 @@ export async function loadEmailTemplate(kind: EmailKind) {
     .select("data,revision").eq("key", EMAIL_TEMPLATE_KEYS[kind]).maybeSingle();
   if (error) throw error;
   return {
-    template: data ? validateEmailTemplate(kind, data.data) : defaultEmailTemplates[kind],
+    template: kind === "confirmation"
+      ? withOrderTrackingReminder(data ? validateEmailTemplate(kind, data.data) : defaultEmailTemplates[kind])
+      : data ? validateEmailTemplate(kind, data.data) : defaultEmailTemplates[kind],
     revision: data?.revision ?? 0,
   };
 }
