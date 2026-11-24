@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { composeOrderEmail, defaultOrderEmailTemplate, manualShippingEmail, manualShippingEmailText, validateOrderEmailTemplate } from "../lib/order-email";
+import { composeOrderEmail, composeManualEmail, defaultOrderEmailTemplate, defaultShippingEmailTemplate, defaultReceivedEmailTemplate, manualShippingEmail, manualShippingEmailText, parseEmailKind, validateEmailTemplate, validateOrderEmailTemplate } from "../lib/order-email";
 
 const order = {
   id: "CC-123",
@@ -58,10 +58,42 @@ test("admin email edits require usable placeholders and reject unknown ones", ()
   assert.throws(() => validateOrderEmailTemplate({ subject: "Hi\nBcc: x", body: "Hello {user_name} {item_name}" }), /subject/);
 });
 
-test("the private shipping draft asks for a review after delivery", () => {
+test("the private shipping draft keeps delivery details for the manual update", () => {
   assert.match(manualShippingEmail.body, /once you've received it/i);
-  assert.match(manualShippingEmail.body, /short review/i);
+  assert.doesNotMatch(manualShippingEmail.body, /short review/i);
   assert.match(manualShippingEmail.body, /\{tracking_id\}/);
   assert.ok(!manualShippingEmailText.includes("**"));
   assert.ok(!manualShippingEmailText.includes("[support@"));
+});
+
+test("shipping draft fills customer, bold item, courier and tracking without sending", () => {
+  const email = composeManualEmail("shipping", order, defaultShippingEmailTemplate, {
+    courierName: "India Post", trackingId: "AB123456789IN",
+  });
+  assert.match(email.subject, /on its way/i);
+  assert.match(email.text, /India Post/);
+  assert.match(email.text, /AB123456789IN/);
+  assert.match(email.html, /<strong>Flower &lt;Card&gt; × 2<\/strong>/);
+  assert.ok(!email.html.includes("<Card>"));
+});
+
+test("received draft asks for a review and an Instagram tag", () => {
+  const email = composeManualEmail("received", order, defaultReceivedEmailTemplate);
+  assert.match(email.text, /short review/i);
+  assert.match(email.text, /tag Campus Crochet on Instagram/i);
+  assert.match(email.html, /<strong>Flower &lt;Card&gt; × 2<\/strong>/);
+});
+
+test("each editable template keeps the fields its message needs", () => {
+  assert.deepEqual(validateEmailTemplate("shipping", defaultShippingEmailTemplate), defaultShippingEmailTemplate);
+  assert.deepEqual(validateEmailTemplate("received", defaultReceivedEmailTemplate), defaultReceivedEmailTemplate);
+  assert.throws(() => validateEmailTemplate("shipping", { subject: "Shipped", body: "Hi {user_name}, {item_name}" }), /courier_name/);
+  assert.throws(() => validateEmailTemplate("received", { subject: "Received", body: "Hi {user_name}" }), /item_name/);
+});
+
+test("only the three known email kinds can be edited", () => {
+  assert.equal(parseEmailKind("confirmation"), "confirmation");
+  assert.equal(parseEmailKind("shipping"), "shipping");
+  assert.equal(parseEmailKind("received"), "received");
+  assert.throws(() => parseEmailKind("order_completion"), /email type/i);
 });

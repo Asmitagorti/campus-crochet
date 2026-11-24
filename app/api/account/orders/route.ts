@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const rows: Record<string, unknown>[] = [];
     for (let offset = 0; ; offset += 500) {
       const { data, error } = await adminDatabase().from("orders")
-        .select("order_id,receipt_number,total_price,subtotal_paise,delivery_paise,delivery_pin,payment_status,order_status,ordered_at,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))")
+        .select("order_id,receipt_number,total_price,subtotal_paise,delivery_paise,delivery_pin,payment_status,order_status,received_at,ordered_at,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))")
         .eq("user_id", user.uid).order("ordered_at", { ascending: false }).range(offset, offset + 499);
       if (error) throw error;
       rows.push(...(data || []));
@@ -23,6 +23,7 @@ export async function GET(request: Request) {
         deliveryPaise: Number(row.delivery_paise || 0),
         paymentStatus: row.order_status === "cancelled" ? "cancelled" : row.payment_status === "captured" ? "paid" : row.payment_status,
         fulfillment: row.order_status === "pending" ? null : row.order_status,
+        receivedAt: row.received_at || null,
         status: row.order_status,
         created_at: row.ordered_at,
         customer: { addressChoice: row.delivery_choice || customer.addressChoice || null, deliveryAddress: row.delivery_address || customer.deliveryAddress || null,

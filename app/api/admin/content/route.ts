@@ -20,6 +20,14 @@ export async function POST(request: Request) {
       if (error) throw error;
       return Response.json({ saved: true });
     }
+    if (body.type === "received") {
+      if (!/^[0-9a-f-]{36}$/i.test(body.id) || !Number.isInteger(body.version)) throw Error("Refresh the order before saving.");
+      const { error } = await db.rpc("shop_mark_received", {
+        p_id: body.id, p_version: body.version, p_actor: admin.uid,
+      });
+      if (error) throw error;
+      return Response.json({ saved: true });
+    }
     if (body.type === "message") {
       const { error } = await db.from("support_tickets").update({ status: "read" }).eq("id", text(body.id, 40));
       if (error) throw error;

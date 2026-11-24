@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { orderProgress } from "../lib/order-progress";
+import { canMarkReceived, orderProgress } from "../lib/order-progress";
 
 test("paid order begins at confirmed", () => {
   assert.deepEqual(orderProgress("paid", null), { label: "Confirmed", step: 1 });
@@ -19,4 +19,12 @@ test("legacy collected orders appear completed and unpaid orders do not progress
 test("Supabase captured payments and quality checks count as in progress", () => {
   assert.deepEqual(orderProgress("captured", "quality_check"), { label: "Making", step: 2 });
   assert.deepEqual(orderProgress("paid", "dispatched"), { label: "Dispatched", step: 4 });
+});
+
+test("a delivered parcel completes the existing fourth customer stage", () => {
+  assert.deepEqual(orderProgress("paid", "dispatched", "2026-11-24T00:00:00Z"), { label: "Delivered", step: 4 });
+  assert.equal(canMarkReceived("paid", "dispatched", null), true);
+  assert.equal(canMarkReceived("paid", "dispatched", "2026-11-24T00:00:00Z"), false);
+  assert.equal(canMarkReceived("pending", "dispatched", null), false);
+  assert.equal(canMarkReceived("paid", "crocheting", null), false);
 });

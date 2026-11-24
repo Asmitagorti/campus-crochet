@@ -14,6 +14,7 @@ type AccountOrder = {
   status: string;
   paymentStatus: string;
   fulfillment: string | null;
+  receivedAt?: string | null;
   created_at: string;
   items: { name: string; quantity: number; price: number }[];
   customer?: { addressChoice: string | null; deliveryAddress: string | null; deliveryPin: string | null };
@@ -133,7 +134,7 @@ export default function Account() {
           ) : (
             <div className="account-orders">
               {orders.map((o) => {
-                const progress = orderProgress(o.paymentStatus, o.fulfillment);
+                const progress = orderProgress(o.paymentStatus, o.fulfillment, o.receivedAt);
                 return <article className="order-history-card" key={o.id}>
                   <div>
                     <strong>{o.id}</strong>
@@ -158,7 +159,7 @@ export default function Account() {
                   <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery: {o.deliveryPaise ? money(o.deliveryPaise / 100) : "Free"}</p>
                   <strong>Total: {money(o.amount / 100)}</strong>
                   {o.paymentStatus === "paid" && <ol className="order-progress" aria-label={`Order ${o.id} progress`}>
-                    {["Confirmed", "Making", "Ready to send", o.customer?.addressChoice === "Others" ? "Dispatched" : "Collected"].map((stage, index) => <li key={stage} className={progress.step >= index + 1 ? "done" : ""} aria-current={progress.step === index + 1 ? "step" : undefined}>{stage}</li>)}
+                    {["Confirmed", "Making", "Ready to send", o.receivedAt ? "Delivered" : o.customer?.addressChoice === "Others" ? "Dispatched" : "Collected"].map((stage, index) => <li key={stage} className={progress.step >= index + 1 ? "done" : ""} aria-current={progress.step === index + 1 ? "step" : undefined}>{stage}</li>)}
                   </ol>}
                   <a href={`mailto:support@campus-crochet.tech?subject=${encodeURIComponent(`Order ${o.id}`)}`}>
                     Ask about this order →

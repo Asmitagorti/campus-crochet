@@ -12,6 +12,12 @@ export type OrderEmailOrder = {
 };
 
 export type OrderEmailTemplate = { subject: string; body: string };
+export type EmailKind = "confirmation" | "shipping" | "received";
+
+export function parseEmailKind(value: unknown): EmailKind {
+  if (value === "confirmation" || value === "shipping" || value === "received") return value;
+  throw Error("Choose a valid email type.");
+}
 
 export const defaultOrderEmailTemplate: OrderEmailTemplate = {
   subject: "Yay! Your Campus Crochet order is confirmed! 🧶",
@@ -38,11 +44,11 @@ Founder & Maker, Campus Crochet 🧶
 [campus-crochet.tech](https://campus-crochet.tech)`,
 };
 
-export const manualShippingEmail = {
+export const defaultShippingEmailTemplate: OrderEmailTemplate = {
   subject: "Your Campus Crochet order is on its way! 🧶📦",
   body: `Hii {user_name}!
 
-Your {item_name} is finally ready, and I've just shipped it to your address!
+Your **{item_name}** is finally ready, and I've just shipped it to your address!
 
 I'm so excited for you to receive something that I've personally made from scratch, especially for you.
 
@@ -53,7 +59,7 @@ Here are your shipping details:
 
 Thank you so much for patiently waiting while I worked on your order. I truly hope it brings a little smile to your face when you unbox it!
 
-Do let me know once you've received it. I'd love to hear what you think! If you have a moment, please reply with a short review of your piece.
+Do let me know once you've received it. I'd love to hear what you think!
 
 If you have any queries regarding your order, feel free to reach out at [support@campus-crochet.tech](mailto:support@campus-crochet.tech).
 
@@ -65,6 +71,33 @@ Founder & Maker, Campus Crochet
 [campus-crochet.tech](https://campus-crochet.tech)`,
 };
 
+export const manualShippingEmail = defaultShippingEmailTemplate;
+
+export const defaultReceivedEmailTemplate: OrderEmailTemplate = {
+  subject: "How is your Campus Crochet piece? 🧶💗",
+  body: `Hii {user_name}!
+
+I hope your **{item_name}** has reached you safely and brought a little smile to your day!
+
+If you have a moment, I'd love to hear what you think. Just reply to this email with a short review of your handmade piece.
+
+If you share a photo or story on Instagram, please tag Campus Crochet on Instagram so I can see your creation in its new home!
+
+Thank you again for supporting my little crochet business. Making something for you meant a lot to me! 💗
+
+With love and a little bit of yarn,
+**Asmita**
+Founder & Maker, Campus Crochet 🧶
+
+[campus-crochet.tech](https://campus-crochet.tech)`,
+};
+
+export const defaultEmailTemplates: Record<EmailKind, OrderEmailTemplate> = {
+  confirmation: defaultOrderEmailTemplate,
+  shipping: defaultShippingEmailTemplate,
+  received: defaultReceivedEmailTemplate,
+};
+
 export const manualShippingEmailText = manualShippingEmail.body
   .replace(/\*\*/g, "")
   .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, "$1");
@@ -72,19 +105,23 @@ export const manualShippingEmailText = manualShippingEmail.body
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
 
-export function validateOrderEmailTemplate(input: unknown): OrderEmailTemplate {
+export function validateEmailTemplate(kind: EmailKind, input: unknown): OrderEmailTemplate {
   if (!input || typeof input !== "object") throw Error("Enter an email subject and message.");
   const value = input as Record<string, unknown>;
   if (typeof value.subject !== "string" || !value.subject.trim() || value.subject.length > 160 || /[\r\n]/.test(value.subject))
     throw Error("Enter a single-line email subject under 160 characters.");
   if (typeof value.body !== "string" || !value.body.trim() || value.body.length > 10000)
     throw Error("Enter an email message under 10,000 characters.");
-  for (const token of ["user_name", "item_name"])
+  for (const token of kind === "shipping" ? ["user_name", "item_name", "courier_name", "tracking_id"] : ["user_name", "item_name"])
     if (!value.body.includes(`{${token}}`)) throw Error(`Keep {${token}} in the email message.`);
   const unknown = `${value.subject}\n${value.body}`.match(/\{[a-z_]+\}/g)?.find((token) =>
-    token !== "{user_name}" && token !== "{item_name}");
+    !["{user_name}", "{item_name}", ...(kind === "shipping" ? ["{courier_name}", "{tracking_id}"] : [])].includes(token));
   if (unknown) throw Error(`Unsupported placeholder ${unknown}.`);
   return { subject: value.subject.trim(), body: value.body.trim() };
+}
+
+export function validateOrderEmailTemplate(input: unknown) {
+  return validateEmailTemplate("confirmation", input);
 }
 
 function itemNames(order: OrderEmailOrder) {
@@ -92,24 +129,27 @@ function itemNames(order: OrderEmailOrder) {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0] || "your handmade piece";
 }
 
-function fillPlaceholders(value: string, order: OrderEmailOrder, html: boolean) {
-  return value.replace(/\{(user_name|item_name)\}/g, (_token, key: string) => {
-    const replacement = key === "user_name" ? order.name : itemNames(order);
+type ShippingDetails = { courierName: string; trackingId: string };
+
+function fillPlaceholders(value: string, order: OrderEmailOrder, html: boolean, details?: ShippingDetails) {
+  return value.replace(/\{(user_name|item_name|courier_name|tracking_id)\}/g, (_token, key: string) => {
+    const replacement = key === "user_name" ? order.name : key === "item_name" ? itemNames(order)
+      : key === "courier_name" ? details?.courierName || "" : details?.trackingId || "";
     return html ? key === "item_name" ? `<strong>${escapeHtml(replacement)}</strong>` : escapeHtml(replacement) : replacement;
   });
 }
 
-function renderBodyHtml(body: string, order: OrderEmailOrder) {
+function renderBodyHtml(body: string, order: OrderEmailOrder, details?: ShippingDetails) {
   const safe = escapeHtml(body.replace(/\*\*\{item_name\}\*\*/g, "{item_name}"))
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
       (_whole, label: string, href: string) => `<a href="${href}" rel="noopener noreferrer">${label}</a>`)
     .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
   return safe.split(/\n\s*\n/).map((paragraph) =>
-    `<p style="margin:0 0 16px">${fillPlaceholders(paragraph, order, true).replace(/\n/g, "<br>")}</p>`).join("");
+    `<p style="margin:0 0 16px">${fillPlaceholders(paragraph, order, true, details).replace(/\n/g, "<br>")}</p>`).join("");
 }
 
-function renderBodyText(body: string, order: OrderEmailOrder) {
-  return fillPlaceholders(body.replace(/\*\*/g, "").replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, "$1"), order, false);
+function renderBodyText(body: string, order: OrderEmailOrder, details?: ShippingDetails) {
+  return fillPlaceholders(body.replace(/\*\*/g, "").replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, "$1"), order, false, details);
 }
 
 export function composeOrderEmail(order: OrderEmailOrder, template: OrderEmailTemplate = defaultOrderEmailTemplate) {
@@ -118,4 +158,12 @@ export function composeOrderEmail(order: OrderEmailOrder, template: OrderEmailTe
   const html = `<div style="font-family:Arial,sans-serif;line-height:1.65;max-width:620px;margin:auto;color:#352b31;padding:20px">${renderBodyHtml(template.body, order)}</div>`;
   const bcc = order.registeredEmail.trim().toLowerCase() === DESIGNATED_ADMIN_EMAIL ? [] : [DESIGNATED_ADMIN_EMAIL];
   return { eventKey: `campus-crochet/confirmation/${order.id}`, to: [order.registeredEmail], bcc, subject, html, text };
+}
+
+export function composeManualEmail(kind: "shipping" | "received", order: OrderEmailOrder,
+  template: OrderEmailTemplate = defaultEmailTemplates[kind], details?: ShippingDetails) {
+  const subject = fillPlaceholders(template.subject, order, false, details);
+  const text = renderBodyText(template.body, order, details);
+  const html = `<div style="font-family:Arial,sans-serif;line-height:1.65;max-width:620px;margin:auto;color:#352b31;padding:20px">${renderBodyHtml(template.body, order, details)}</div>`;
+  return { to: order.registeredEmail, subject, html, text };
 }

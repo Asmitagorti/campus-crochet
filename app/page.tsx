@@ -1,6 +1,5 @@
 "use client";
 import { media } from "@/lib/media";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
@@ -11,11 +10,8 @@ import {
   Leaf,
   ShoppingBag,
   Gift,
-  X,
   Plus,
 } from "lucide-react";
-import { categories, photo } from "@/lib/catalog";
-import { belongsToCategory, productCategoryNames, visibleCategoryGroups } from "@/lib/product-categories";
 import { Yarn, Sprig, Title } from "@/components/design";
 import ProductPrice from "@/components/product-price";
 import { useShop } from "@/components/site-shell";
@@ -28,22 +24,8 @@ const reveal = {
 export default function Home() {
   const router = useRouter();
   const { liked, toggleLike, add, catalog: products, settings, mode } = useShop();
-  const [query, setQuery] = useState(""),
-    [category, setCategory] = useState("All"),
-    [onlyLiked, setOnlyLiked] = useState(false);
-  const showAll = false;
-  const availableCategories = visibleCategoryGroups(products, categories.map((item) => item.name));
-  const visible = products.filter(
-    (p) =>
-      (category === "All" || belongsToCategory(p, category)) &&
-      (!onlyLiked || liked.includes(p.id)) &&
-      `${p.name} ${productCategoryNames(p).join(" ")}`.toLowerCase().includes(query.toLowerCase()),
-  );
-  function browse(name = "All") {
-    router.push(
-      name === "All" ? "/shop" : `/shop?category=${encodeURIComponent(name)}`,
-    );
-  }
+  const visible = products.slice(0, 5);
+  function browse() { router.push("/shop"); }
   if (mode === "poll") return <main id="home" className="poll-home">
     <section className="hero">
       <div className="hero-photo" style={{ backgroundImage: `url("${settings.heroImage}")` }} role="img" aria-label="Warm crochet craft studio" />
@@ -150,32 +132,6 @@ export default function Home() {
           </div>
         ))}
       </section>
-      {availableCategories.length > 0 && <motion.section {...reveal} className="categories section-wrap">
-        <Sprig className="corner-doodle" />
-        <Title sub="Little pieces of happiness, sorted for you.">
-          Explore Our Collection
-        </Title>
-        <div className="category-grid">
-          {availableCategories.map((c, i) => (
-            <button
-              className="category-card"
-              key={c.name}
-              onClick={() => browse(c.name)}
-              style={
-                { "--tilt": `${i % 2 ? 1 : -1}deg` } as React.CSSProperties
-              }
-            >
-              <div className="photo-frame">
-                <img src={c.image} alt={c.name} loading="lazy" />
-              </div>
-              <h3>{c.name}</h3>
-              <span className="mini-button">
-                View all <ArrowRight size={10} />
-              </span>
-            </button>
-          ))}
-        </div>
-      </motion.section>}
       <motion.section
         {...reveal}
         className="featured section-wrap"
@@ -184,36 +140,8 @@ export default function Home() {
         <Title sub="Handpicked favourites, made to melt hearts.">
           Featured Collection
         </Title>
-        <div className="filter-row">
-          <button
-            className={category === "All" && !onlyLiked ? "selected" : ""}
-            onClick={() => {
-              setCategory("All");
-              setOnlyLiked(false);
-              setQuery("");
-            }}
-          >
-            All the little things
-          </button>
-          {category !== "All" && (
-            <button className="selected" onClick={() => setCategory("All")}>
-              {category} <X size={12} />
-            </button>
-          )}
-          {onlyLiked && (
-            <button className="selected" onClick={() => setOnlyLiked(false)}>
-              Your favourites <X size={12} />
-            </button>
-          )}
-          <span>Made slowly. Meant to stay.</span>
-        </div>
         <div className="product-grid">
-          {visible
-            .slice(
-              0,
-              category === "All" && !query && !onlyLiked && !showAll ? 5 : 8,
-            )
-            .map((p, i) => (
+          {visible.map((p, i) => (
               <motion.article
                 className="product-card"
                 key={p.id}
@@ -251,23 +179,14 @@ export default function Home() {
                   Add to bag <Plus size={12} />
                 </button>
               </motion.article>
-            ))}
+          ))}
         </div>
         {visible.length === 0 && (
           <div className="empty-state">
             <Heart />
             <h3>No little treasures here just yet.</h3>
-            <p>Try another search, or save something you love.</p>
-            <button
-              className="small-button"
-              onClick={() => {
-                setQuery("");
-                setOnlyLiked(false);
-                setCategory("All");
-              }}
-            >
-              Explore everything
-            </button>
+            <p>New handmade pieces will appear here soon.</p>
+            <button className="small-button" onClick={() => browse()}>Explore everything</button>
           </div>
         )}
         <button className="text-link" onClick={() => router.push("/shop")}>
@@ -370,59 +289,25 @@ export default function Home() {
               icon: Heart,
               title: "A little beautifully imperfect",
               body: "Every piece is made by hand. Small variations are part of what makes yours yours.",
-              img: "bunny",
             },
             {
               icon: Scissors,
               title: "A decade in every stitch",
               body: "Ten years of learning, making and falling in love with crochet, all over again.",
-              img: "coaster",
             },
             {
               icon: Leaf,
               title: "A gentle kind of love",
               body: "Hand wash gently and let your crochet air dry. A little care goes a long way.",
-              img: "minion",
             },
-          ].map(({ icon: Icon, title, body, img }) => (
+          ].map(({ icon: Icon, title, body }) => (
             <article className="note-card" key={title}>
               <Icon size={23} />
               <h3>{title}</h3>
               <p>{body}</p>
-              <img
-                src={`/images/${img}.jpg`}
-                alt={`${img} crochet detail`}
-                loading="lazy"
-              />
             </article>
           ))}
         </div>
-      </motion.section>
-      <motion.section {...reveal} className="moments section-wrap">
-        <Title sub="Real photos. Real stitches. A little everyday happiness.">
-          Little Moments, Big Joy
-        </Title>
-        <div className="moment-grid">
-          {["stitch", "bunny", "coaster", "bag", "tulips", "minion"].map(
-            (id, i) => (
-              <button
-                key={id}
-                onClick={() => router.push(`/products/${id}`)}
-                aria-label={`Open ${id} photo`}
-              >
-                <img
-                  src={photo(id)}
-                  alt={`Original handmade ${id} photograph`}
-                  loading="lazy"
-                />
-                <span>
-                  <Heart size={18} />
-                </span>
-              </button>
-            ),
-          )}
-        </div>
-        <div className="handwritten">Made by hand. Loved for real. ♡</div>
       </motion.section>
     </main>
   );

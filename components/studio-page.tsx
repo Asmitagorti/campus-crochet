@@ -12,6 +12,7 @@ import StudioAnalytics from "./studio-analytics";
 import StudioShopPreview from "./studio-shop-preview";
 import StudioEmails from "./studio-emails";
 import StudioOrderFulfillment from "./studio-order-fulfillment";
+import StudioOrderMessages from "./studio-order-messages";
 import {
   Plus,
   Upload,
@@ -42,6 +43,7 @@ type StudioOrder = {
   postagePaise: number;
   status: string;
   fulfillment?: string;
+  receivedAt?: string | null;
   customer: {
     name: string;
     email: string;
@@ -743,18 +745,18 @@ export default function Studio() {
             return (!query || [o.id, o.receipt, o.customer.name, o.customer.email].some((v) => v.toLowerCase().includes(query))) &&
               (!orderDate || o.created_at.slice(0, 10) === orderDate) &&
               (paymentFilter === "all" || o.status === paymentFilter) &&
-              (fulfillmentFilter === "all" || orderProgress(o.status, o.fulfillment).step === Number(fulfillmentFilter));
+              (fulfillmentFilter === "all" || orderProgress(o.status, o.fulfillment, o.receivedAt).step === Number(fulfillmentFilter));
           }).map((o) => (
             <article className="studio-record" key={o.id}>
               <div className="editor-top">
                 <h3>
                   {o.receipt} {o.mode === "test" && <small>· TEST</small>}
                 </h3>
-                <span className="status-pill">{orderProgress(o.status, o.fulfillment).label}</span>
+                <span className="status-pill">{orderProgress(o.status, o.fulfillment, o.receivedAt).label}</span>
                 <strong>{money(o.amount / 100)}</strong>
               </div>
               <p>{new Date(o.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} · {o.customer.name} · {o.customer.email}</p>
-              <p>Payment: {o.status} · Fulfillment: {orderProgress(o.status, o.fulfillment).label}</p>
+              <p>Payment: {o.status} · Fulfillment: {orderProgress(o.status, o.fulfillment, o.receivedAt).label}</p>
               <details className="order-details"><summary>View order details</summary>
                 <p>Mobile: {o.customer.phone}</p>
                 <p>Delivery: {o.customer.addressChoice || o.customer.pickup || "Not recorded"}{o.customer.deliveryAddress ? ` · ${o.customer.deliveryAddress}` : ""}{o.customer.deliveryPin ? ` · ${o.customer.deliveryPin}` : ""}</p>
@@ -773,8 +775,11 @@ export default function Studio() {
                   onSaved={async () => { await load(); setNotice("Order tracking saved."); }}
                   onLocked={() => setAccess({ configured: true, unlocked: false })} />
               )}
-              {o.status === "paid" && ["completed", "dispatched", "collected"].includes(o.fulfillment || "") &&
-                <p className="quiet-note">No email is sent by this status change. Email {o.customer.email} yourself from support@campus-crochet.tech when you are ready.</p>}
+              {o.status === "paid" && o.fulfillment === "completed" &&
+                <p className="quiet-note">When you ship this order, mark it Dispatched. Then prepare the shipping email here and send it from your support mailbox.</p>}
+              {o.status === "paid" && ["dispatched", "collected"].includes(o.fulfillment || "") &&
+                <StudioOrderMessages order={o} onUpdated={load}
+                  onLocked={() => setAccess({ configured: true, unlocked: false })} />}
             </article>
           ))}
         </section>

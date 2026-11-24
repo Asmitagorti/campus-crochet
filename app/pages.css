@@ -1757,6 +1757,28 @@ input[type="checkbox"] {
   display: grid;
   gap: 20px;
 }
+.studio-email-editor {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.studio-order-messages {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  margin-top: 18px;
+}
+.studio-manual-email {
+  width: 100%;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.studio-manual-email .field { max-width: none; }
+.studio-manual-email textarea { width: 100%; min-height: 220px; resize: vertical; }
+.studio-manual-email > .outline-button { margin: 0 0 12px; }
 .studio-email-section .studio-section-heading,
 .studio-email-section .studio-editor {
   width: 100%;

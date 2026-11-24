@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const db = adminDatabase();
     const [products, settings, orders, messages, journey, draftState, runtimeState, pollRows, pollSettingsRow] = await Promise.all([
       loadDraftProducts(), loadDraftSettings(),
-      allRows("orders", "order_id,receipt_number,total_price,subtotal_paise,postage_paise,delivery_paise,delivery_pin,payment_status,order_status,ordered_at,version,razorpay_payment_id,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))", "ordered_at"),
+      allRows("orders", "order_id,receipt_number,total_price,subtotal_paise,postage_paise,delivery_paise,delivery_pin,payment_status,order_status,received_at,ordered_at,version,razorpay_payment_id,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))", "ordered_at"),
       allRows("support_tickets", "id,name,email,subject,message,status,created_at", "created_at"),
       db.from("shop_journey_drafts").select("slug,data,published,revision").order("updated_at", { ascending: false }),
       db.from("shop_draft_state").select("dirty,revision,last_published_at").eq("id", true).single(),
@@ -64,6 +64,7 @@ export async function GET(request: Request) {
           postagePaise: Number(row.postage_paise || 0),
           status: row.payment_status === "captured" ? "paid" : row.order_status === "cancelled" ? "cancelled" : "pending",
           fulfillment: row.order_status,
+          receivedAt: row.received_at || null,
           version: row.version,
           paymentId: row.razorpay_payment_id || null,
           customer: { name: customer.name || "", email: customer.email || "", phone: customer.phone || "",
