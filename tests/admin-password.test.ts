@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ADMIN_UNLOCK_SECONDS,
   hashAdminPassword,
   verifyAdminPassword,
   createAdminUnlockToken,
@@ -17,6 +18,7 @@ test("admin password is salted and cannot be replaced by a short password", asyn
 });
 
 test("admin unlock is bound to account, Google session and current password hash", () => {
+  assert.equal(ADMIN_UNLOCK_SECONDS, 8 * 60 * 60);
   const now = 1_800_000_000_000;
   const secret = "s".repeat(64);
   const hash = "stored-hash-one";
@@ -26,5 +28,6 @@ test("admin unlock is bound to account, Google session and current password hash
   assert.equal(verifyAdminUnlockToken(token, "owner-id", "other-session", hash, secret, now + 1000), false);
   assert.equal(verifyAdminUnlockToken(token, "owner-id", "session-id", "new-password-hash", secret, now + 1000), false);
   assert.equal(verifyAdminUnlockToken(token + "x", "owner-id", "session-id", hash, secret, now + 1000), false);
-  assert.equal(verifyAdminUnlockToken(token, "owner-id", "session-id", hash, secret, now + 60 * 60 * 1000 + 1), false);
+  assert.equal(verifyAdminUnlockToken(token, "owner-id", "session-id", hash, secret, now + 8 * 60 * 60 * 1000 - 1), true);
+  assert.equal(verifyAdminUnlockToken(token, "owner-id", "session-id", hash, secret, now + 8 * 60 * 60 * 1000 + 1), false);
 });

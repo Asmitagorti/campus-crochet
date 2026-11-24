@@ -6,10 +6,8 @@ export function orderProgress(paymentStatus: string, fulfillment: string | null 
   if (fulfillment === "dispatched") return { label: "Dispatched", step: 4 };
   if (fulfillment === "collected") return { label: "Collected", step: 4 };
   if (fulfillment === "completed") return { label: "Ready to send", step: 3 };
-  if (fulfillment === "yarn_selected") return { label: "Yarn selected", step: 2 };
-  if (fulfillment === "crocheting") return { label: "Crocheting", step: 2 };
-  if (fulfillment === "quality_check") return { label: "Quality check", step: 2 };
   if (fulfillment === "ready" || fulfillment === "ready_for_pickup") return { label: "Ready to send", step: 3 };
-  if (fulfillment === "preparing") return { label: "Preparing", step: 2 };
+  if (["yarn_selected", "crocheting", "quality_check", "preparing"].includes(fulfillment || ""))
+    return { label: "Making", step: 2 };
   return { label: "Confirmed", step: 1 };
 }

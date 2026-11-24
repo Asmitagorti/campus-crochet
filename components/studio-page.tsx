@@ -12,6 +12,7 @@ import StudioPolls, { type AdminPoll } from "./studio-polls";
 import StudioAnalytics from "./studio-analytics";
 import StudioShopPreview from "./studio-shop-preview";
 import StudioEmails from "./studio-emails";
+import StudioOrderFulfillment from "./studio-order-fulfillment";
 import {
   Plus,
   Upload,
@@ -731,7 +732,7 @@ export default function Studio() {
             <label>Search order or customer<input type="search" value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} placeholder="ID, name or email" /></label>
             <label>Date<input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></label>
             <label>Payment<select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}><option value="all">All</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="cancelled">Cancelled</option></select></label>
-            <label>Fulfillment<select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)}><option value="all">All</option><option value="payment_received">Payment received</option><option value="yarn_selected">Yarn selected</option><option value="crocheting">Crocheting</option><option value="quality_check">Quality check</option><option value="ready">Ready</option><option value="completed">Ready to send</option><option value="dispatched">Dispatched</option><option value="collected">Collected</option></select></label>
+            <label>Tracking<select value={fulfillmentFilter} onChange={(e) => setFulfillmentFilter(e.target.value)}><option value="all">All</option><option value="1">Confirmed</option><option value="2">Making</option><option value="3">Ready to send</option><option value="4">Dispatched / Collected</option></select></label>
           </div>
           {!data?.orders.length && (
             <p className="loading-note">
@@ -743,7 +744,7 @@ export default function Studio() {
             return (!query || [o.id, o.receipt, o.customer.name, o.customer.email].some((v) => v.toLowerCase().includes(query))) &&
               (!orderDate || o.created_at.slice(0, 10) === orderDate) &&
               (paymentFilter === "all" || o.status === paymentFilter) &&
-              (fulfillmentFilter === "all" || o.fulfillment === fulfillmentFilter);
+              (fulfillmentFilter === "all" || orderProgress(o.status, o.fulfillment).step === Number(fulfillmentFilter));
           }).map((o) => (
             <article className="studio-record" key={o.id}>
               <div className="editor-top">
@@ -768,29 +769,10 @@ export default function Studio() {
                 {o.paymentId && <p>Razorpay payment: {o.paymentId}</p>}
               </details>
               {o.status === "paid" && !["dispatched", "collected"].includes(o.fulfillment || "") && (
-                <label className="field">
-                  Fulfilment
-                  <select
-                    value={o.fulfillment || ""}
-                    onChange={(e) =>
-                      void save("/api/admin/content", {
-                        type: "order",
-                        id: o.id,
-                        version: o.version,
-                        fulfillment: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="payment_received">Payment received</option>
-                    <option value="yarn_selected">Yarn selected</option>
-                    <option value="crocheting">Crocheting</option>
-                    <option value="quality_check">Quality check</option>
-                    <option value="ready">Ready</option>
-                    <option value="completed">Finished / ready to send</option>
-                    {o.customer.addressChoice === "Others" && <option value="dispatched">Dispatched</option>}
-                    {o.customer.addressChoice !== "Others" && <option value="collected">Collected</option>}
-                  </select>
-                </label>
+                <StudioOrderFulfillment id={o.id} version={o.version} fulfillment={o.fulfillment}
+                  deliveryChoice={o.customer.addressChoice}
+                  onSaved={async () => { await load(); setNotice("Order tracking saved."); }}
+                  onLocked={() => setAccess({ configured: true, unlocked: false })} />
               )}
               {o.status === "paid" && o.fulfillment === "completed" &&
                 <p className="quiet-note">No email is sent by this status change. Write to {o.customer.email} yourself from support@campus-crochet.tech when you are ready.</p>}

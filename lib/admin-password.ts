@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 const SCRYPT_OPTIONS = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
-export const ADMIN_UNLOCK_SECONDS = 60 * 60;
+export const ADMIN_UNLOCK_SECONDS = 8 * 60 * 60;
 
 function derive(password: string, salt: Buffer) {
   return new Promise<Buffer>((resolve, reject) => {
