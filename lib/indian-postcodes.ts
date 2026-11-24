@@ -1,5 +1,6 @@
-import { getDetails, lookup } from "@devzoy/indian-pincode-geo";
+import { getDetails } from "@devzoy/indian-pincode";
 import { indianStates } from "./indian-states";
+import postalPlaces from "./postal-places.json";
 
 function normalizePlace(value: string): string {
   return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
@@ -29,11 +30,10 @@ export function validateDestination(pin: string, state: string, city: string): v
     throw Error("The delivery PIN does not match the state you selected.");
   const town = normalizePlace(city);
   if (city.trim().length > 80 || town.length < 2) throw Error("Please enter a valid town or city.");
-  // One PIN can serve several post offices; compare the chosen state's office and district names.
-  const offices = lookup(pin).filter((office) => office.state === state);
-  const places = offices.length
-    ? offices.flatMap((office) => [office.officeName, office.district || ""])
-    : details.districts;
+  // Bundled place names avoid a runtime file read inside Vercel functions.
+  // A PIN can have offices in more than one state, so use only the selected state.
+  const places = (postalPlaces as Record<string, Record<string, string[]>>)[pin]?.[state]
+    ?? details.districts;
   const matchesDelhi = state === "DELHI" && (town === "DELHI" || town === "NEW DELHI");
   if (!matchesDelhi && !places.map(normalizePlace).some((place) => matchesPlace(place, town)))
     throw Error("The delivery PIN does not match the town or city entered. Check the PIN and town name.");
