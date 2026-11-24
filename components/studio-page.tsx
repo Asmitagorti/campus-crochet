@@ -11,6 +11,7 @@ import { dispatchWhatsAppUrl } from "@/lib/whatsapp";
 import StudioPolls, { type AdminPoll } from "./studio-polls";
 import StudioAnalytics from "./studio-analytics";
 import StudioShopPreview from "./studio-shop-preview";
+import StudioEmails from "./studio-emails";
 import {
   Plus,
   Upload,
@@ -375,6 +376,7 @@ export default function Studio() {
           { id: "analytics", Icon: Heart },
           { id: "delivery", Icon: Package },
           { id: "orders", Icon: ShoppingBag },
+          { id: "emails", Icon: MessageCircle },
           { id: "messages", Icon: MessageCircle },
           { id: "journey", Icon: BookOpen },
           { id: "settings", Icon: Settings },
@@ -798,6 +800,7 @@ export default function Studio() {
           ))}
         </section>
       )}
+      {tab === "emails" && <StudioEmails />}
       {tab === "messages" && (
         <section>
           <h2>A few little hellos</h2>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { composeOrderEmail } from "../lib/order-email";
+import { composeOrderEmail, defaultOrderEmailTemplate, manualShippingEmail, manualShippingEmailText, validateOrderEmailTemplate } from "../lib/order-email";
 
 const order = {
   id: "CC-123",
@@ -11,32 +11,50 @@ const order = {
   totalPaise: 59800,
 };
 
-test("confirmation includes the order facts and escapes customer data", () => {
+test("default confirmation follows Asmita's message and bolds purchased item names", () => {
   const email = composeOrderEmail(order);
   assert.deepEqual(email.to, ["asha@gmail.com"]);
-  assert.match(email.subject, /CC-123/);
-  for (const detail of ["Flower", "2", "₹299", "₹598", "Aditya Surampalem"])
-    assert.ok(email.text.includes(detail));
-  assert.ok(email.html.includes("Asha &lt;Rao&gt;"));
+  assert.equal(email.subject, "Yay! Your Campus Crochet order is confirmed! 🧶");
+  assert.match(email.text, /Hii Asha <Rao>!/);
+  assert.match(email.text, /Your order for Flower <Card> × 2 has officially been placed and received!/);
+  assert.match(email.text, /1–2 weeks/);
+  assert.match(email.text, /pursuing my B\.Tech/);
+  assert.match(email.html, /<strong>Flower &lt;Card&gt; × 2<\/strong>/);
   assert.ok(!email.html.includes("<Card>"));
-  assert.match(email.text, /5–7 working days/i);
-  assert.match(email.text, /email you personally/i);
+  assert.match(email.html, /mailto:support@campus-crochet\.tech/);
+  assert.ok(!email.text.includes("Total paid:"));
+  assert.ok(!email.text.includes("Order ID:"));
   assert.equal(email.eventKey, "campus-crochet/confirmation/CC-123");
 });
 
-test("delivery confirmation shows the saved charge and complete destination", () => {
-  const delivery = { ...order, address: "Flat 2, Chennai, Tamil Nadu 600001",
-    items: [{ name: "Flower <Card>", quantity: 1, price: 299 }],
-    subtotalPaise: 29900, deliveryPaise: 6900, totalPaise: 36800 };
-  const email = composeOrderEmail(delivery);
-  assert.match(email.text, /Delivery charge: ₹69/);
-  assert.match(email.text, /Total paid: ₹368/);
-  assert.match(email.html, /Flat 2, Chennai, Tamil Nadu 600001/);
+test("a saved template is used for later messages and multiple items remain bold", () => {
+  const template = { subject: "A special order from Campus Crochet", body: "Hii {user_name}!\n\nYour {item_name} is confirmed.\n\n**Thank you**" };
+  const email = composeOrderEmail({ ...order, items: [order.items[0], { name: "Blue hat", quantity: 1, price: 400 }] }, template);
+  assert.equal(email.subject, template.subject);
+  assert.match(email.text, /Flower <Card> × 2 and Blue hat/);
+  assert.match(email.html, /<strong>Flower &lt;Card&gt; × 2 and Blue hat<\/strong>/);
+  assert.match(email.html, /<strong>Thank you<\/strong>/);
 });
 
-test("free delivery appears in the confirmation", () => {
-  const freeDelivery = { ...order, subtotalPaise: 59800, deliveryPaise: 0 };
-  const email = composeOrderEmail(freeDelivery);
-  assert.match(email.text, /Delivery charge: Free/);
-  assert.match(email.html, /Delivery charge:<\/strong> Free/);
+test("edited email content cannot inject HTML or unsafe links", () => {
+  const template = { subject: "Order confirmed", body: "Hi {user_name}, {item_name}. <script>alert(1)</script> [click](javascript:alert(1))" };
+  const email = composeOrderEmail(order, template);
+  assert.ok(!email.html.includes("<script>"));
+  assert.ok(!email.html.includes('href="javascript:'));
+  assert.match(email.html, /&lt;script&gt;/);
+});
+
+test("admin email edits require usable placeholders and reject unknown ones", () => {
+  assert.deepEqual(validateOrderEmailTemplate(defaultOrderEmailTemplate), defaultOrderEmailTemplate);
+  assert.throws(() => validateOrderEmailTemplate({ subject: "Hi", body: "Hello {user_name}" }), /item_name/);
+  assert.throws(() => validateOrderEmailTemplate({ subject: "Hi", body: "Hello {user_name} {item_name} {tracking_id}" }), /Unsupported/);
+  assert.throws(() => validateOrderEmailTemplate({ subject: "Hi\nBcc: x", body: "Hello {user_name} {item_name}" }), /subject/);
+});
+
+test("the private shipping draft asks for a review after delivery", () => {
+  assert.match(manualShippingEmail.body, /once you've received it/i);
+  assert.match(manualShippingEmail.body, /short review/i);
+  assert.match(manualShippingEmail.body, /\{tracking_id\}/);
+  assert.ok(!manualShippingEmailText.includes("**"));
+  assert.ok(!manualShippingEmailText.includes("[support@"));
 });

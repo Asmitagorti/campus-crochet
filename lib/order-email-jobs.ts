@@ -2,6 +2,7 @@ import "server-only";
 import { adminDatabase } from "./supabase-admin";
 import { OrderEmailOrder } from "./order-email";
 import { sendOrderEmail } from "./resend";
+import { loadOrderEmailTemplate } from "./order-email-template-store";
 
 type EmailJob = {
   id: string;
@@ -25,7 +26,8 @@ export async function dispatchOrderEmails(limit = 10) {
     if (job.kind !== "order_confirmation") continue;
     try {
       const payload = { ...job.payload, registeredEmail: job.recipient };
-      const providerId = await sendOrderEmail(payload, job.event_key);
+      const { template } = await loadOrderEmailTemplate();
+      const providerId = await sendOrderEmail(payload, job.event_key, template);
       const { error: updateError } = await db.from("notification_jobs")
         .update({ status: "sent", sent_at: new Date().toISOString(), provider_id: providerId, last_error: null })
         .eq("id", job.id).eq("status", "sending");
