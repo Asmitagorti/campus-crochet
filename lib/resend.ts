@@ -13,7 +13,7 @@ export async function sendOrderEmail(order: OrderEmailOrder, idempotencyKey?: st
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey || message.eventKey },
-    body: JSON.stringify({ from, to: message.to, reply_to: "support@campus-crochet.tech", subject: message.subject, html: message.html, text: message.text }),
+    body: JSON.stringify({ from, to: message.to, bcc: message.bcc, reply_to: "support@campus-crochet.tech", subject: message.subject, html: message.html, text: message.text }),
     signal: AbortSignal.timeout(12000),
   });
   const result = await response.json().catch(() => ({}));
