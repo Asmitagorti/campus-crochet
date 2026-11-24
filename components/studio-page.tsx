@@ -426,7 +426,11 @@ export default function Studio() {
               if (await save("/api/admin/mode", { action: "shop", draftRevision: data.shopDraftRevision }))
                 window.dispatchEvent(new CustomEvent("campus-mode-changed", { detail: "shop" }));
             }}>Publish draft and show shop</button>}
-            {data.siteMode === "shop" && <p>To show a revised shop, switch to the poll in Polls, check the draft here, then publish it.</p>}
+            {data.siteMode === "shop" && data.shopDraftDirty && <button type="button" className="stitch-button" disabled={busy || !data.launchReadiness.ready} onClick={async () => {
+              if (!window.confirm("Publish these reviewed draft changes to the live shop now? Customers will see the updated prices and products.")) return;
+              await save("/api/admin/mode", { action: "shop", draftRevision: data.shopDraftRevision });
+            }}>Publish changes to live shop</button>}
+            {data.siteMode === "shop" && !data.shopDraftDirty && <p>The live shop matches this draft.</p>}
           </div>
         </div>
         <StudioShopPreview products={data.products} settings={data.settings} journey={data.journey}
