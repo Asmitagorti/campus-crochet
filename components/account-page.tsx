@@ -113,7 +113,7 @@ export default function Account() {
               </button>
             </div>
           </div>
-          <p className="account-guidance">Check this page regularly for order progress. Keep your registered email accessible and enable notifications for the order confirmation and completion messages.</p>
+          <p className="account-guidance">Check this page regularly for order progress. Your confirmation email arrives after payment; the studio will email you personally when your piece is ready.</p>
           {error && <p className="form-error">{error}</p>}
           {loading || ordersOwner !== user.uid ? (
             <p className="loading-note">Finding your little orders…</p>

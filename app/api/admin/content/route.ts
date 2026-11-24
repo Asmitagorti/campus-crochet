@@ -1,6 +1,5 @@
 import { adminDatabase } from "@/lib/supabase-admin";
 import { requireAdminAccess } from "@/lib/admin-access";
-import { dispatchOrderEmails } from "@/lib/order-email-jobs";
 import { guard, text, errorResponse } from "@/lib/forms";
 import { validImage } from "@/lib/image-url";
 import { defaultSettings } from "@/lib/site-settings";
@@ -19,9 +18,6 @@ export async function POST(request: Request) {
         p_id: body.id, p_version: body.version, p_status: body.fulfillment, p_actor: admin.uid,
       });
       if (error) throw error;
-      if (body.fulfillment === "completed") {
-        try { await dispatchOrderEmails(5); } catch (error) { console.error("Completion email queue unavailable", error); }
-      }
       return Response.json({ saved: true });
     }
     if (body.type === "message") {

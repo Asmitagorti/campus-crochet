@@ -790,6 +790,8 @@ export default function Studio() {
                   </select>
                 </label>
               )}
+              {o.status === "paid" && o.fulfillment === "completed" &&
+                <p className="quiet-note">No email is sent by this status change. Write to {o.customer.email} yourself from support@campus-crochet.tech when you are ready.</p>}
               {o.fulfillment === "dispatched" && dispatchWhatsAppUrl(o.customer.phone, o.receipt) &&
                 <a className="outline-button" href={dispatchWhatsAppUrl(o.customer.phone, o.receipt)!} target="_blank" rel="noopener noreferrer">Open WhatsApp dispatch message</a>}
             </article>

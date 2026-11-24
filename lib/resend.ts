@@ -1,15 +1,15 @@
 import "server-only";
-import { composeOrderEmail, OrderEmailKind, OrderEmailOrder } from "./order-email";
+import { composeOrderEmail, OrderEmailOrder } from "./order-email";
 
 export class ResendResponseError extends Error {
   constructor(public status: number) { super(`Resend rejected the email (${status}).`); }
 }
 
-export async function sendOrderEmail(kind: OrderEmailKind, order: OrderEmailOrder, idempotencyKey?: string) {
+export async function sendOrderEmail(order: OrderEmailOrder, idempotencyKey?: string) {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   if (!key || !from) throw Error("Resend order email is not configured.");
-  const message = composeOrderEmail(kind, order);
+  const message = composeOrderEmail(order);
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey || message.eventKey },

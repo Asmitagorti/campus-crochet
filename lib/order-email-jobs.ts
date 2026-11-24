@@ -6,7 +6,7 @@ import { sendOrderEmail } from "./resend";
 type EmailJob = {
   id: string;
   event_key: string;
-  kind: "order_confirmation" | "order_completion";
+  kind: string;
   recipient: string;
   payload: OrderEmailOrder;
 };
@@ -20,10 +20,12 @@ export async function dispatchOrderEmails(limit = 10) {
   if (error) throw error;
   let sent = 0;
   for (const job of (data || []) as EmailJob[]) {
+    // Stay safe if the app deploys before the database migration: never send
+    // a previously queued completion message.
+    if (job.kind !== "order_confirmation") continue;
     try {
-      const kind = job.kind === "order_confirmation" ? "confirmation" : "completion";
       const payload = { ...job.payload, registeredEmail: job.recipient };
-      const providerId = await sendOrderEmail(kind, payload, job.event_key);
+      const providerId = await sendOrderEmail(payload, job.event_key);
       const { error: updateError } = await db.from("notification_jobs")
         .update({ status: "sent", sent_at: new Date().toISOString(), provider_id: providerId, last_error: null })
         .eq("id", job.id).eq("status", "sending");
