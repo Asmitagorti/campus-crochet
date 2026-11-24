@@ -7,7 +7,6 @@ import { parseProductCategories, productCategoryNames } from "@/lib/product-cate
 import { JournalEntry } from "@/lib/journal";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
 import { orderProgress } from "@/lib/order-progress";
-import { dispatchWhatsAppUrl } from "@/lib/whatsapp";
 import StudioPolls, { type AdminPoll } from "./studio-polls";
 import StudioAnalytics from "./studio-analytics";
 import StudioShopPreview from "./studio-shop-preview";
@@ -774,10 +773,8 @@ export default function Studio() {
                   onSaved={async () => { await load(); setNotice("Order tracking saved."); }}
                   onLocked={() => setAccess({ configured: true, unlocked: false })} />
               )}
-              {o.status === "paid" && o.fulfillment === "completed" &&
-                <p className="quiet-note">No email is sent by this status change. Write to {o.customer.email} yourself from support@campus-crochet.tech when you are ready.</p>}
-              {o.fulfillment === "dispatched" && dispatchWhatsAppUrl(o.customer.phone, o.receipt) &&
-                <a className="outline-button" href={dispatchWhatsAppUrl(o.customer.phone, o.receipt)!} target="_blank" rel="noopener noreferrer">Open WhatsApp dispatch message</a>}
+              {o.status === "paid" && ["completed", "dispatched", "collected"].includes(o.fulfillment || "") &&
+                <p className="quiet-note">No email is sent by this status change. Email {o.customer.email} yourself from support@campus-crochet.tech when you are ready.</p>}
             </article>
           ))}
         </section>
