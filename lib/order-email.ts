@@ -1,5 +1,3 @@
-import { DESIGNATED_ADMIN_EMAIL } from "./admin-identity";
-
 export type OrderEmailOrder = {
   id: string;
   registeredEmail: string;
@@ -170,8 +168,7 @@ export function composeOrderEmail(order: OrderEmailOrder, template: OrderEmailTe
   const subject = fillPlaceholders(template.subject, order, false);
   const text = renderBodyText(template.body, order);
   const html = `<div style="font-family:Arial,sans-serif;line-height:1.65;max-width:620px;margin:auto;color:#352b31;padding:20px">${renderBodyHtml(template.body, order)}</div>`;
-  const bcc = order.registeredEmail.trim().toLowerCase() === DESIGNATED_ADMIN_EMAIL ? [] : [DESIGNATED_ADMIN_EMAIL];
-  return { eventKey: `campus-crochet/confirmation/${order.id}`, to: [order.registeredEmail], bcc, subject, html, text };
+  return { eventKey: `campus-crochet/confirmation/${order.id}`, to: [order.registeredEmail], subject, html, text };
 }
 
 export function composeManualEmail(kind: "shipping" | "received", order: OrderEmailOrder,

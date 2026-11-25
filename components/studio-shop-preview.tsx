@@ -9,7 +9,7 @@ import { indianStates } from "@/lib/indian-states";
 import type { JournalEntry } from "@/lib/journal";
 import ProductPrice from "./product-price";
 import GiftPersonalizationForm, { defaultGiftChoices } from "./gift-personalization";
-import type { GiftPersonalization } from "@/lib/personalization";
+import { productCover, productGallery, type GiftPersonalization } from "@/lib/personalization";
 import { defaultCartColor } from "@/lib/cart-colors";
 
 type View = "home" | "shop" | "product" | "bag" | "about" | "journey" | "contact";
@@ -85,7 +85,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
       </div>
       <h3>Featured collection</h3>
       <div className="shop-preview-grid">{visible.slice(0, 6).map((item) => <article key={item.id}>
-        <button type="button" className="shop-preview-photo" onClick={() => openProduct(item.id)}><img src={item.gallery[0]} alt={item.name} /></button>
+        <button type="button" className="shop-preview-photo" onClick={() => openProduct(item.id)}><img src={productCover(item)} alt={item.name} /></button>
         <h4>{item.name}</h4><p><ProductPrice product={item} /></p><button type="button" className="outline-button" onClick={() => openProduct(item.id)}>View item</button>
       </article>)}</div>
     </>}
@@ -94,7 +94,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
       <div className="shop-preview-categories"><button type="button" className={category === "All" ? "selected" : ""} onClick={() => setCategory("All")}>All ({visible.length})</button>
         {categories.map((item) => <button type="button" key={item.name} className={category === item.name ? "selected" : ""} onClick={() => setCategory(item.name)}>{item.name} ({item.count})</button>)}</div>
       <div className="shop-preview-grid">{visible.filter((item) => category === "All" || productCategoryNames(item).includes(category)).map((item) => <article key={item.id}>
-        <button type="button" className="shop-preview-photo" onClick={() => openProduct(item.id)}><img src={item.gallery[0]} alt={item.name} /></button>
+        <button type="button" className="shop-preview-photo" onClick={() => openProduct(item.id)}><img src={productCover(item)} alt={item.name} /></button>
         <h3>{item.name}</h3><p>{item.note}</p><strong><ProductPrice product={item} /></strong><p>Made to order</p>
         <div className="shop-preview-card-actions"><button type="button" className="outline-button" onClick={() => openProduct(item.id)}>View item</button>
           <button type="button" className="small-button" onClick={() => { if (item.colorOptions?.length) openProduct(item.id); else { add(item.id); setView("bag"); } }}>
@@ -103,8 +103,8 @@ export default function StudioShopPreview({ products, settings, journey, email, 
       {!visible.length && <p>No items are set to show in the shop yet. Add one in Products.</p>}
     </>}
     {view === "product" && product && <div className="shop-preview-detail">
-      <div><img src={photoIndex < 0 ? product.colorOptions?.[-photoIndex - 1]?.image || product.gallery[0] : product.gallery[photoIndex] || product.gallery[0]} alt={product.name} />
-        <div className="shop-preview-thumbs">{product.gallery.map((url, index) => <button type="button" key={`${url}-${index}`} aria-label={`View photo ${index + 1}`} onClick={() => setPhotoIndex(index)}><img src={url} alt="" /></button>)}</div></div>
+      <div><img src={productGallery(product, selectedColors[product.id])[photoIndex] || productCover(product)} alt={product.name} />
+        <div className="shop-preview-thumbs">{productGallery(product, selectedColors[product.id]).map((url, index) => <button type="button" key={`${url}-${index}`} aria-label={`View photo ${index + 1}`} onClick={() => setPhotoIndex(index)}><img src={url} alt="" /></button>)}</div></div>
       <div><button type="button" className="text-link" onClick={() => setView("shop")}>← Back to shop</button>
         <h2>{product.name}</h2><p>{product.description}</p><p>{productCategoryNames(product).join(" · ")}</p>
         <div className="detail-price"><ProductPrice product={product} /></div><p>Made to order · Complimentary handwritten card available at checkout.</p>
@@ -112,7 +112,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
           <div>{product.colorOptions.map((choice) => <button type="button" key={choice.name}
             className={(selectedColors[product.id] || defaultCartColor(product)) === choice.name ? "selected" : ""}
             aria-pressed={(selectedColors[product.id] || defaultCartColor(product)) === choice.name}
-            onClick={() => { setSelectedColors((current) => ({ ...current, [product.id]: choice.name })); setPhotoIndex(-product.colorOptions!.indexOf(choice) - 1); }}>
+            onClick={() => { setSelectedColors((current) => ({ ...current, [product.id]: choice.name })); setPhotoIndex(0); }}>
             <img src={choice.image} alt="" /><span>{choice.name}</span></button>)}</div></div>}
         <button type="button" className="stitch-button" onClick={() => { add(product.id); setView("bag"); }}>Add to test bag</button></div>
     </div>}
@@ -145,7 +145,7 @@ export default function StudioShopPreview({ products, settings, journey, email, 
           {quote && <p className="form-success" role="status">Details accepted. Test total: {money(quote.totalPaise / 100)}. No order or payment was created.</p>}
         </form>
         <aside className="checkout-summary"><h3>Your test collection</h3>
-          {items.map((item) => <div className="checkout-item" key={item.id}><img src={item.gallery[0]} alt={item.name} /><div><strong>{item.name}</strong><p>Quantity {item.quantity}</p>
+          {items.map((item) => <div className="checkout-item" key={item.id}><img src={productCover(item)} alt={item.name} /><div><strong>{item.name}</strong><p>Quantity {item.quantity}</p>
             <button type="button" className="text-link" onClick={() => { setBag((current) => { const next = { ...current }; delete next[item.id]; return next; });
               setPersonalizations((current) => { const next = { ...current }; delete next[item.id]; return next; }); setQuote(null); }}>Remove</button></div><strong><ProductPrice product={item} quantity={item.quantity} showSavings={false} /></strong></div>)}
           <div className="total-line"><span>Subtotal</span><strong>{money(estimate.subtotalPaise / 100)}</strong></div>

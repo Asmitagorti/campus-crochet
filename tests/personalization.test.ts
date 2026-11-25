@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Product } from "../lib/catalog";
-import { defaultPersonalization, parseColorOptions, parseOrderPersonalizations } from "../lib/personalization";
+import { colorGallery, defaultPersonalization, parseColorOptions, parseOrderPersonalizations, productCover, productGallery, withColorGallery } from "../lib/personalization";
 
 const octopus = { id: "octopus", name: "Little Octopus", colorOptions: [
   { name: "Lavender", hex: "#bd9bd2", image: "https://example.com/lavender.jpg" },
@@ -49,4 +49,26 @@ test("admin colour choices need distinct names and photo fields", () => {
   assert.throws(() => parseColorOptions([{ name: "Pink", hex: "#eeb2c8", image: "photo" },
     { name: "pink", hex: "#eeb2c8", image: "photo" }]), /different/);
   assert.throws(() => parseColorOptions([{ name: "Pink", hex: "#eeb2c8", image: "" }]), /photo/);
+});
+
+test("each colour has its own ordered gallery and the first colour covers the collection card", () => {
+  const options = parseColorOptions([
+    { name: "Lavender", hex: "#bd9bd2", images: ["lavender-front", "lavender-back"] },
+    { name: "Pink", hex: "#eeb2c8", image: "pink-front", images: ["pink-front", "pink-side"] },
+  ]);
+  const product = { ...octopus, gallery: ["old-main"], colorOptions: options };
+  assert.equal(productCover(product), "lavender-front");
+  assert.deepEqual(productGallery(product), ["lavender-front", "lavender-back"]);
+  assert.deepEqual(productGallery(product, "Pink"), ["pink-front", "pink-side"]);
+  assert.deepEqual(colorGallery(options[1]), ["pink-front", "pink-side"]);
+  assert.deepEqual(withColorGallery(options[0], ["lavender-back", "lavender-front"]).images,
+    ["lavender-back", "lavender-front"]);
+  assert.equal(withColorGallery(options[0], ["lavender-back", "lavender-front"]).image, "lavender-back");
+});
+
+test("old single-photo colours still open, and empty or oversized galleries are rejected", () => {
+  const legacy = parseColorOptions([{ name: "Pink", hex: "#eeb2c8", image: "pink-front" }]);
+  assert.deepEqual(colorGallery(legacy[0]), ["pink-front"]);
+  assert.throws(() => parseColorOptions([{ name: "Pink", hex: "#eeb2c8", images: [] }]), /photo/);
+  assert.throws(() => parseColorOptions([{ name: "Pink", hex: "#eeb2c8", images: Array(9).fill("photo") }]), /eight/);
 });

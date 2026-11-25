@@ -39,6 +39,6 @@ test("published colour choices retain their names and matching photos", () => {
   const product = mapStoreProduct({ slug: "octopus", name: "Mr. Octopus", category: "Crochet Toys",
     color_options: [{ name: "Lavender", hex: "#bb99cc", image: "lavender-photo" }],
     product_images: [{ image_url: "main-photo", display_order: 0 }] });
-  assert.deepEqual(product.colorOptions, [{ name: "Lavender", hex: "#bb99cc", image: "lavender-photo" }]);
+  assert.deepEqual(product.colorOptions, [{ name: "Lavender", hex: "#bb99cc", image: "lavender-photo", images: ["lavender-photo"] }]);
   assert.equal(product.gallery[0], "main-photo");
 });

@@ -15,6 +15,7 @@ import {
 import { Yarn, Sprig, Title } from "@/components/design";
 import ProductPrice from "@/components/product-price";
 import { useShop } from "@/components/site-shell";
+import { productCover } from "@/lib/personalization";
 const reveal = {
   initial: { opacity: 0, y: 22 },
   whileInView: { opacity: 1, y: 0 },
@@ -156,7 +157,7 @@ export default function Home() {
                     aria-label={`View ${p.name}`}
                     onClick={() => router.push(`/products/${p.id}`)}
                   >
-                    <img src={p.gallery[0]} alt={p.name} loading="lazy" />
+                    <img src={productCover(p)} alt={p.name} loading="lazy" />
                   </button>
                   <button
                     className={`favourite ${liked.includes(p.id) ? "is-liked" : ""}`}

@@ -26,16 +26,17 @@ import { useShop } from "./site-shell";
 import { ProductCard } from "./product-card";
 import ProductPrice from "./product-price";
 import { Title } from "./design";
+import { productGallery } from "@/lib/personalization";
 export default function ProductDetail({ product: p }: { product: Product }) {
   const { add, liked, toggleLike, catalog: products } = useShop(),
     router = useRouter();
   const [quantity, setQuantity] = useState(1),
     [image, setImage] = useState(0),
     [selectedColor, setSelectedColor] = useState(p.colorOptions?.[0]?.name || "As pictured"),
-    [colourImage, setColourImage] = useState<string | null>(p.colorOptions?.[0]?.image || null),
     [tab, setTab] = useState("The little details"),
     [zoom, setZoom] = useState(false);
   const max = maxQuantity(p);
+  const gallery = productGallery(p, selectedColor);
   const related = products
     .filter((x) => x.id !== p.id)
     .sort(
@@ -68,9 +69,8 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               aria-label="Enlarge product photo"
             >
               <img
-                src={colourImage || p.gallery[image]}
-                alt={colourImage ? `${p.name} in ${p.colorOptions?.find((option) => option.image === colourImage)?.name || "selected colour"}`
-                  : `${p.name}, photo ${image + 1}`}
+                src={gallery[image] || gallery[0]}
+                alt={`${p.name}${p.colorOptions?.length ? ` in ${selectedColor}` : ""}, photo ${image + 1}`}
                 width={800}
                 height={900}
               />
@@ -81,11 +81,11 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             </span>
           </div>
           <div className="photo-thumbnails">
-            {p.gallery.map((src, i) => (
+            {gallery.map((src, i) => (
               <button
                 key={src}
                 className={image === i ? "selected" : ""}
-                onClick={() => { setImage(i); setColourImage(null); }}
+                onClick={() => setImage(i)}
                 aria-label={`Show ${p.name} photo ${i + 1}`}
                 aria-pressed={image === i}
               >
@@ -122,7 +122,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           {(p.colorOptions?.length || 0) > 0 ? <div className="product-colour-choices">
             <strong>Choose your colour</strong><p>See each finished colour and pick yours before adding it to your bag.</p>
             <div>{p.colorOptions!.map((option) => <button type="button" key={option.name}
-              className={selectedColor === option.name ? "selected" : ""} onClick={() => { setSelectedColor(option.name); setColourImage(option.image); }}
+              className={selectedColor === option.name ? "selected" : ""} onClick={() => { setSelectedColor(option.name); setImage(0); }}
               aria-label={`Choose ${p.name} in ${option.name}`} aria-pressed={selectedColor === option.name}>
               <img src={option.image} alt="" /><span>{option.name}</span></button>)}</div>
           </div> : <p className="product-fixed-colour">Colour as pictured · Add gift details at checkout.</p>}
@@ -302,7 +302,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           >
             <X />
           </button>
-          <img src={colourImage || p.gallery[image]} alt={p.name} />
+          <img src={gallery[image] || gallery[0]} alt={p.name} />
         </div>
       )}
     </main>

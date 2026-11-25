@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { Product, photo, availability, canOrder } from "@/lib/catalog";
 import ProductPrice from "./product-price";
 import { useShop } from "./site-shell";
+import { productCover } from "@/lib/personalization";
 export function ProductCard({
   product: p,
   index = 0,
@@ -26,7 +27,7 @@ export function ProductCard({
           aria-label={`View ${p.name}`}
         >
           <img
-            src={p.gallery[0]}
+            src={productCover(p)}
             alt={p.name}
             loading="lazy"
             width={400}

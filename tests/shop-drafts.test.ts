@@ -12,7 +12,7 @@ test("a saved draft product keeps its private catalogue details", () => {
   assert.equal(result.id, "blue-bag");
   assert.deepEqual(result.categories, ["Bags", "Gifts"]);
   assert.deepEqual(result.gallery, ["first", "second"]);
-  assert.deepEqual(result.colorOptions, [{ name: "Blue", hex: "#123456", image: "blue-photo" }]);
+  assert.deepEqual(result.colorOptions, [{ name: "Blue", hex: "#123456", image: "blue-photo", images: ["blue-photo"] }]);
   assert.equal(result.revision, 3);
   assert.equal(result.stock, null);
   assert.equal(result.madeToOrder, true);

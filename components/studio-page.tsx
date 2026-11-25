@@ -15,6 +15,7 @@ import StudioOrderFulfillment from "./studio-order-fulfillment";
 import StudioOrderMessages from "./studio-order-messages";
 import { personalizationSummary } from "./gift-personalization";
 import type { GiftPersonalization } from "@/lib/personalization";
+import { colorGallery, withColorGallery, productCover } from "@/lib/personalization";
 import {
   Plus,
   Upload,
@@ -186,7 +187,10 @@ export default function Studio() {
       });
       const result = await response.json();
       if (!response.ok) throw Error(result.error || "Could not check admin access.");
-      setAccess({ configured: result.configured === true, unlocked: result.unlocked === true });
+      const configured = result.configured === true;
+      const unlocked = result.unlocked === true;
+      setAccess((previous) => previous?.configured === configured && previous?.unlocked === unlocked
+        ? previous : { configured, unlocked });
     } catch (cause) {
       setAccessError(cause instanceof Error ? cause.message : "Could not check admin access.");
     }
@@ -194,6 +198,12 @@ export default function Studio() {
   useEffect(() => {
     if (admin) void checkAccess();
     else { setAccess(null); setData(null); }
+  }, [admin, checkAccess]);
+  useEffect(() => {
+    if (!admin) return;
+    const recheck = () => void checkAccess();
+    window.addEventListener("focus", recheck);
+    return () => window.removeEventListener("focus", recheck);
   }, [admin, checkAccess]);
   useEffect(() => {
     if (admin && access?.unlocked) void load();
@@ -268,6 +278,37 @@ export default function Studio() {
       setNotice("Photo uploaded to Supabase Storage.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function uploadColorPhotos(files: File[], index: number) {
+    if (!files.length) return;
+    if (colorGallery(editing!.colorOptions![index]).length + files.length > 8) {
+      setError("Add up to eight photos for each colour.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const urls: string[] = [];
+      for (const file of files) {
+        const form = new FormData();
+        form.set("file", file);
+        const response = await fetch("/api/admin/upload", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${await token()}` },
+          body: form,
+        });
+        const body = await response.json();
+        if (!response.ok) throw Error(body.error || "Upload failed.");
+        urls.push(body.url);
+      }
+      setEditing((current) => current ? { ...current, colorOptions: current.colorOptions!.map((option, position) =>
+        position === index ? withColorGallery(option, [...colorGallery(option), ...urls]) : option) } : current);
+      setNotice(`${urls.length} colour photo${urls.length === 1 ? "" : "s"} uploaded to Supabase Storage.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Upload failed.");
     } finally {
       setBusy(false);
     }
@@ -556,28 +597,42 @@ export default function Studio() {
             </div>
             <fieldset className="studio-colour-options">
               <legend>Colours customers can choose (optional)</legend>
-              <p className="quiet-note">Leave this empty for fixed designs like the bunny, tulips and sunflower bag. For the octopus and coasters, make the pictured colour first: it is selected by default. Upload a photo of the finished item in every colour.</p>
+              <p className="quiet-note">Leave this empty for fixed designs. Add the pictured colour first: its first photo becomes the shop collection picture. Upload up to eight pictures for each colour. Customers see only that colour’s pictures when they select it.</p>
               {(editing.colorOptions || []).map((option, index) => <div className="studio-colour-option" key={index}>
-                <div className="studio-colour-photo">{option.image ? <img src={option.image} alt={`${option.name || "Colour"} sample`} /> : <span>Photo needed</span>}</div>
                 <div className="field"><label htmlFor={`colour-name-${index}`}>Colour name {index === 0 ? "· default" : ""}</label>
                   <input id={`colour-name-${index}`} value={option.name} maxLength={40} required
                     onChange={(event) => setEditing({ ...editing, colorOptions: editing.colorOptions!.map((entry, i) => i === index ? { ...entry, name: event.target.value } : entry) })} /></div>
                 <div className="field"><label htmlFor={`colour-hex-${index}`}>Swatch</label>
                   <input id={`colour-hex-${index}`} type="color" value={option.hex}
                     onChange={(event) => setEditing({ ...editing, colorOptions: editing.colorOptions!.map((entry, i) => i === index ? { ...entry, hex: event.target.value } : entry) })} /></div>
-                <label className="outline-button studio-colour-upload">Upload this colour’s photo
-                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy}
-                    onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file, (url) =>
-                      setEditing((value) => value ? { ...value, colorOptions: value.colorOptions!.map((entry, i) => i === index ? { ...entry, image: url } : entry) } : value)); event.target.value = ""; }} /></label>
-                {index === 0 && editing.gallery[0] && <button type="button" className="text-link" onClick={() => setEditing({ ...editing,
-                  colorOptions: editing.colorOptions!.map((entry, i) => i === 0 ? { ...entry, image: editing.gallery[0] } : entry) })}>Use main product photo</button>}
+                <div className="studio-colour-gallery" aria-label={`${option.name || `Colour ${index + 1}`} photos`}>
+                  {colorGallery(option).map((url, photoIndex, pictures) => <div className="studio-colour-gallery-item" key={`${url}-${photoIndex}`}>
+                    <img src={url} alt={`${option.name || "Colour"} photo ${photoIndex + 1}`} />
+                    <span>{photoIndex === 0 ? index === 0 ? "Shop cover" : "Colour cover" : `Photo ${photoIndex + 1}`}</span>
+                    <div>
+                      <button type="button" className="text-link" disabled={busy || photoIndex === 0} aria-label={`Move ${option.name || "colour"} photo ${photoIndex + 1} left`}
+                        onClick={() => { const next = [...pictures]; [next[photoIndex - 1], next[photoIndex]] = [next[photoIndex], next[photoIndex - 1]];
+                          setEditing({ ...editing, colorOptions: editing.colorOptions!.map((entry, i) => i === index ? withColorGallery(entry, next) : entry) }); }}>←</button>
+                      <button type="button" className="text-link" disabled={busy || photoIndex === pictures.length - 1} aria-label={`Move ${option.name || "colour"} photo ${photoIndex + 1} right`}
+                        onClick={() => { const next = [...pictures]; [next[photoIndex + 1], next[photoIndex]] = [next[photoIndex], next[photoIndex + 1]];
+                          setEditing({ ...editing, colorOptions: editing.colorOptions!.map((entry, i) => i === index ? withColorGallery(entry, next) : entry) }); }}>→</button>
+                      <button type="button" className="text-link" disabled={busy} aria-label={`Remove ${option.name || "colour"} photo ${photoIndex + 1}`}
+                        onClick={() => setEditing({ ...editing, colorOptions: editing.colorOptions!.map((entry, i) => i === index ? withColorGallery(entry, pictures.filter((_, position) => position !== photoIndex)) : entry) })}>Remove</button>
+                    </div>
+                  </div>)}
+                </div>
+                <label className="outline-button studio-colour-upload">Add photos for this colour
+                  <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy || colorGallery(option).length >= 8}
+                    onChange={(event) => { const files = Array.from(event.target.files || []); if (files.length) void uploadColorPhotos(files, index); event.target.value = ""; }} /></label>
+                {index === 0 && editing.gallery.length > 0 && <button type="button" className="text-link" disabled={busy}
+                  onClick={() => setEditing({ ...editing, colorOptions: editing.colorOptions!.map((entry, i) => i === 0 ? withColorGallery(entry, editing.gallery.slice(0, 8)) : entry) })}>Copy main product photos to default colour</button>}
                 <button type="button" className="text-link" disabled={busy || index === 0} onClick={() => { const next = [...editing.colorOptions!]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; setEditing({ ...editing, colorOptions: next }); }}>Move up</button>
                 <button type="button" className="text-link" disabled={busy || index === editing.colorOptions!.length - 1} onClick={() => { const next = [...editing.colorOptions!]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; setEditing({ ...editing, colorOptions: next }); }}>Move down</button>
                 <button type="button" className="text-link" disabled={busy} onClick={() => setEditing({ ...editing,
                   colorOptions: editing.colorOptions!.filter((_, i) => i !== index) })}>Remove colour</button>
               </div>)}
               <button type="button" className="outline-button" disabled={busy || (editing.colorOptions?.length || 0) >= 12}
-                onClick={() => setEditing({ ...editing, colorOptions: [...(editing.colorOptions || []), { name: "", hex: "#c9add7", image: "" }] })}>Add a colour choice</button>
+                onClick={() => setEditing({ ...editing, colorOptions: [...(editing.colorOptions || []), { name: "", hex: "#c9add7", image: "", images: [] }] })}>Add a colour choice</button>
             </fieldset>
             <fieldset className="spec-editor">
               <legend>Specifications</legend>
@@ -634,6 +689,7 @@ export default function Studio() {
                 Add a specification +
               </button>
             </fieldset>
+            <p className="quiet-note">Main product photos: used for designs without colour choices. For designs with colours, the first colour’s photos appear in the shop; these remain as a fallback for older pages.</p>
             <div className="upload-gallery">
               {editing.gallery.map((url, i) => (
                 <div key={url}>
@@ -705,7 +761,7 @@ export default function Studio() {
             <div className="studio-product-list">
               {data?.products.map((p) => (
                 <article key={p.id}>
-                  <img src={p.gallery[0]} alt={p.name} />
+                  <img src={productCover(p)} alt={p.name} />
                   <div>
                     <h3>{p.name}</h3>
                     <span>

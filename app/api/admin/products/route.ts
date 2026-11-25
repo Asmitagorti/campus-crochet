@@ -6,7 +6,7 @@ import { guard, text, errorResponse } from "@/lib/forms";
 import { categories } from "@/lib/catalog";
 import { parseProductCategories, productCategoryNames } from "@/lib/product-categories";
 import { readJsonBody } from "@/lib/request-body";
-import { parseColorOptions } from "@/lib/personalization";
+import { colorGallery, parseColorOptions } from "@/lib/personalization";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
@@ -25,14 +25,15 @@ export async function POST(request: Request) {
     if (body.packedWeightGrams != null && (!Number.isInteger(body.packedWeightGrams) ||
       body.packedWeightGrams < 1 || body.packedWeightGrams > 50000))
       throw Error("Packed weight must be a whole number of grams between 1 and 50,000.");
-    if (!Array.isArray(body.gallery) || body.gallery.length < 1 || body.gallery.length > 8 || !body.gallery.every(validImage))
+    const colorOptions = parseColorOptions(body.colorOptions ?? []);
+    const gallery = Array.isArray(body.gallery) && body.gallery.length ? body.gallery : colorOptions[0] ? colorGallery(colorOptions[0]) : [];
+    if (gallery.length < 1 || gallery.length > 8 || !gallery.every(validImage))
       throw Error("Add between one and eight photos from Supabase Storage.");
     if (!Array.isArray(body.colors) || body.colors.length > 8 ||
       !body.colors.every((color: unknown) => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)))
       throw Error("Use valid six-digit colour codes.");
-    const colorOptions = parseColorOptions(body.colorOptions ?? []);
-    if (colorOptions.some((option) => !validImage(option.image)))
-      throw Error("Upload each colour photo to Supabase Storage.");
+    if (colorOptions.some((option) => !colorGallery(option).every(validImage)))
+      throw Error("Upload every colour photo to Supabase Storage.");
     if (!Array.isArray(body.details) || body.details.length > 20 ||
       !body.details.every((detail: unknown) => Array.isArray(detail) && detail.length === 2 &&
         detail.every((value: unknown) => typeof value === "string" && value.length < 400)))
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     const draftData = { name, description, note, category: chosenCategories[0], categories: chosenCategories,
       price: body.price, discountPrice: body.discountPrice ?? null, packedWeightGrams: body.packedWeightGrams ?? null,
       active: body.active === true, details: body.details, colors: body.colors,
-      colorOptions, gallery: body.gallery };
+      colorOptions, gallery };
     const db = adminDatabase();
     if (body.create === true) {
       const { data, error } = await db.from("shop_product_drafts")

@@ -1,6 +1,20 @@
 import type { Product } from "./catalog";
 
-export type ColorOption = { name: string; hex: string; image: string };
+export type ColorOption = { name: string; hex: string; image: string; images?: string[] };
+export function colorGallery(option: ColorOption): string[] {
+  return option.images?.length ? option.images : option.image ? [option.image] : [];
+}
+export function withColorGallery(option: ColorOption, images: string[]): ColorOption {
+  return { ...option, image: images[0] || "", images };
+}
+export function productGallery(product: Product, selectedColor?: string): string[] {
+  const options = product.colorOptions || [];
+  const choice = options.find((option) => option.name === selectedColor) || options[0];
+  return choice ? colorGallery(choice) : product.gallery;
+}
+export function productCover(product: Product): string {
+  return productGallery(product)[0] || product.gallery[0] || "";
+}
 export type GiftPersonalization = {
   color: string;
   recipientName: string;
@@ -34,11 +48,16 @@ export function parseColorOptions(value: unknown): ColorOption[] {
     if (!item || typeof item !== "object") throw Error("Please check the colour choices.");
     const row = item as Record<string, unknown>;
     const name = cleanText(row.name, "colour name", 40);
-    if (!name || !/^#[0-9a-f]{6}$/i.test(String(row.hex)) || typeof row.image !== "string" || !row.image)
+    if (!name || !/^#[0-9a-f]{6}$/i.test(String(row.hex)))
       throw Error("Every colour needs a name, colour swatch and photo.");
+    const images = row.images === undefined ? [row.image] : row.images;
+    if (!Array.isArray(images) || images.length < 1 ||
+      images.some((image) => typeof image !== "string" || !image.trim()))
+      throw Error("Every colour needs at least one photo.");
+    if (images.length > 8) throw Error("Add up to eight photos per colour.");
     if (names.has(name.toLocaleLowerCase("en-IN"))) throw Error("Colour names must be different.");
     names.add(name.toLocaleLowerCase("en-IN"));
-    return { name, hex: String(row.hex).toLowerCase(), image: row.image };
+    return { name, hex: String(row.hex).toLowerCase(), image: images[0] as string, images: images as string[] };
   });
 }
 

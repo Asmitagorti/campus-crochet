@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { browserDatabase } from "@/lib/supabase-client";
 import { afterGoogleDestination, isSuccessfulGoogleCallback } from "@/lib/auth-redirect";
-import { checkedSession } from "@/lib/auth-session-state";
+import { checkedSession, sameSignedInAccount } from "@/lib/auth-session-state";
 
 type AccountUser = { uid: string; email: string | null; displayName: string | null };
 type AuthState = {
@@ -33,21 +33,27 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [admin, setAdmin] = useState(false);
   const [error, setError] = useState("");
   const generation = useRef(0);
+  const activeUid = useRef<string | null>(null);
   const callbackSucceeded = useRef(false);
   const sync = useCallback(async (current: SupabaseUser | null, accessToken?: string) => {
     const run = ++generation.current;
-    setUser(accountUser(current));
-    setAdmin(false);
+    const nextUser = accountUser(current);
+    const sameAccount = sameSignedInAccount(activeUid.current, nextUser?.uid || null);
+    activeUid.current = nextUser?.uid || null;
+    setUser((previous) => previous?.uid === nextUser?.uid && previous?.email === nextUser?.email &&
+      previous?.displayName === nextUser?.displayName ? previous : nextUser);
+    if (!sameAccount) setAdmin(false);
     setError("");
     if (current && accessToken) {
       try {
         const response = await fetch("/api/auth/session", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
         const data = await response.json();
         if (run === generation.current) {
-          const checked = checkedSession(accountUser(current), {
+          const checked = checkedSession(nextUser, {
             ok: response.ok, admin: data.admin, error: data.error,
           });
-          setUser(checked.user);
+          setUser((previous) => previous?.uid === checked.user?.uid && previous?.email === checked.user?.email &&
+            previous?.displayName === checked.user?.displayName ? previous : checked.user);
           setAdmin(checked.admin);
           setError(checked.error);
           if (response.ok) {

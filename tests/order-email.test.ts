@@ -14,7 +14,7 @@ const order = {
 test("default confirmation follows Asmita's message and bolds purchased item names", () => {
   const email = composeOrderEmail(order);
   assert.deepEqual(email.to, ["asha@gmail.com"]);
-  assert.deepEqual(email.bcc, ["asmileis4evr@gmail.com"]);
+  assert.ok(!("bcc" in email));
   assert.equal(email.subject, "Yay! Your Campus Crochet order is confirmed! 🧶");
   assert.match(email.text, /Hii Asha <Rao>!/);
   assert.match(email.text, /Your order for Flower <Card> × 2 has officially been placed and received!/);
@@ -30,10 +30,10 @@ test("default confirmation follows Asmita's message and bolds purchased item nam
   assert.equal(email.eventKey, "campus-crochet/confirmation/CC-123");
 });
 
-test("an owner purchase gets one copy without duplicating its recipient", () => {
+test("customer confirmation contains no owner-only details", () => {
   const email = composeOrderEmail({ ...order, registeredEmail: "asmileis4evr@gmail.com" });
   assert.deepEqual(email.to, ["asmileis4evr@gmail.com"]);
-  assert.deepEqual(email.bcc, []);
+  assert.ok(!("bcc" in email));
 });
 
 test("a saved template is used for later messages and multiple items remain bold", () => {
