@@ -1,5 +1,6 @@
 import { adminDatabase, requireUser } from "@/lib/supabase-admin";
 import { errorResponse } from "@/lib/forms";
+import { savedPersonalizations } from "@/lib/personalization";
 
 export const runtime = "nodejs";
 export async function GET(request: Request) {
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
     const rows: Record<string, unknown>[] = [];
     for (let offset = 0; ; offset += 500) {
       const { data, error } = await adminDatabase().from("orders")
-        .select("order_id,receipt_number,total_price,subtotal_paise,delivery_paise,delivery_pin,payment_status,order_status,received_at,ordered_at,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))")
+        .select("order_id,receipt_number,total_price,subtotal_paise,delivery_paise,delivery_pin,payment_status,order_status,received_at,ordered_at,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(slug,name))")
         .eq("user_id", user.uid).order("ordered_at", { ascending: false }).range(offset, offset + 499);
       if (error) throw error;
       rows.push(...(data || []));
@@ -28,10 +29,11 @@ export async function GET(request: Request) {
         created_at: row.ordered_at,
         customer: { addressChoice: row.delivery_choice || customer.addressChoice || null, deliveryAddress: row.delivery_address || customer.deliveryAddress || null,
           deliveryPin: row.delivery_pin || customer.deliveryPin || null },
-        items: ((row.order_items || []) as { products: { name?: string } | null; product_name_at_purchase?: string; quantity: number; price_at_purchase: number }[]).map((item) => ({
+        items: ((row.order_items || []) as { products: { slug?: string; name?: string } | null; product_name_at_purchase?: string; quantity: number; price_at_purchase: number }[]).map((item) => ({
           name: item.product_name_at_purchase || (item.products as { name?: string } | null)?.name || "Handmade piece",
           quantity: Number(item.quantity || 0),
           price: Number(item.price_at_purchase || 0),
+          personalizations: savedPersonalizations(customer, item.products?.slug || ""),
         })),
       };
     });

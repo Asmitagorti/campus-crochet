@@ -175,8 +175,9 @@ export default function Home() {
                 </button>
                 <p>{p.note}</p>
                 <span className="price-note"><ProductPrice product={p} /></span>
-                <button className="small-button" onClick={() => add(p.id)}>
-                  Add to bag <Plus size={12} />
+                <button className="small-button" onClick={() => p.colorOptions?.length
+                  ? router.push(`/products/${p.id}`) : add(p.id)}>
+                  {p.colorOptions?.length ? "Choose colour" : "Add to bag"} <Plus size={12} />
                 </button>
               </motion.article>
           ))}

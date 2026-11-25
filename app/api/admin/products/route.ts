@@ -6,6 +6,7 @@ import { guard, text, errorResponse } from "@/lib/forms";
 import { categories } from "@/lib/catalog";
 import { parseProductCategories, productCategoryNames } from "@/lib/product-categories";
 import { readJsonBody } from "@/lib/request-body";
+import { parseColorOptions } from "@/lib/personalization";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
@@ -29,6 +30,9 @@ export async function POST(request: Request) {
     if (!Array.isArray(body.colors) || body.colors.length > 8 ||
       !body.colors.every((color: unknown) => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)))
       throw Error("Use valid six-digit colour codes.");
+    const colorOptions = parseColorOptions(body.colorOptions ?? []);
+    if (colorOptions.some((option) => !validImage(option.image)))
+      throw Error("Upload each colour photo to Supabase Storage.");
     if (!Array.isArray(body.details) || body.details.length > 20 ||
       !body.details.every((detail: unknown) => Array.isArray(detail) && detail.length === 2 &&
         detail.every((value: unknown) => typeof value === "string" && value.length < 400)))
@@ -45,7 +49,8 @@ export async function POST(request: Request) {
     }
     const draftData = { name, description, note, category: chosenCategories[0], categories: chosenCategories,
       price: body.price, discountPrice: body.discountPrice ?? null, packedWeightGrams: body.packedWeightGrams ?? null,
-      active: body.active === true, details: body.details, colors: body.colors, gallery: body.gallery };
+      active: body.active === true, details: body.details, colors: body.colors,
+      colorOptions, gallery: body.gallery };
     const db = adminDatabase();
     if (body.create === true) {
       const { data, error } = await db.from("shop_product_drafts")

@@ -1,6 +1,7 @@
 import { Product } from "./catalog";
 import { productCategoryNames } from "./product-categories";
 import { effectiveProductPrice } from "./pricing";
+import { parseColorOptions } from "./personalization";
 
 type ImageRow = { image_url?: string; display_order?: number };
 export type StoreProductRow = {
@@ -18,6 +19,7 @@ export type StoreProductRow = {
   is_available?: boolean;
   details?: unknown;
   display_colors?: unknown;
+  color_options?: unknown;
   revision?: number;
   product_images?: ImageRow[];
 };
@@ -41,6 +43,7 @@ export function mapStoreProduct(row: StoreProductRow, saleActive = false): Produ
     revision: row.revision || 0,
     details,
     colors: Array.isArray(row.display_colors) ? row.display_colors.filter((color): color is string => typeof color === "string") : [],
+    colorOptions: parseColorOptions(row.color_options ?? []),
     gallery: (row.product_images || []).filter((image) => typeof image.image_url === "string").sort((a, b) => (a.display_order || 0) - (b.display_order || 0)).map((image) => image.image_url!),
   };
 }

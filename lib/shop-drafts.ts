@@ -2,6 +2,7 @@ import type { Product } from "./catalog";
 import { deliveryChargePaise } from "./delivery-policy";
 import { productCategoryNames } from "./product-categories";
 import { effectiveProductPrice } from "./pricing";
+import { parseColorOptions } from "./personalization";
 
 export type ProductDraftRow = {
   draft_id: string;
@@ -33,6 +34,7 @@ export function draftProductFromRow(row: ProductDraftRow): Product {
     revision: row.revision,
     details: Array.isArray(data.details) ? data.details as [string, string][] : [],
     colors: Array.isArray(data.colors) ? data.colors as string[] : [],
+    colorOptions: parseColorOptions(data.colorOptions ?? []),
     gallery: Array.isArray(data.gallery) ? data.gallery as string[] : [],
   };
 }

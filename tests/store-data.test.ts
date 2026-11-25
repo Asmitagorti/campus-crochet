@@ -34,3 +34,11 @@ test("published opening discount appears only during the sale", () => {
   assert.equal(mapStoreProduct(row, false).price, 599);
   assert.equal(mapStoreProduct(row, false).regularPrice, null);
 });
+
+test("published colour choices retain their names and matching photos", () => {
+  const product = mapStoreProduct({ slug: "octopus", name: "Mr. Octopus", category: "Crochet Toys",
+    color_options: [{ name: "Lavender", hex: "#bb99cc", image: "lavender-photo" }],
+    product_images: [{ image_url: "main-photo", display_order: 0 }] });
+  assert.deepEqual(product.colorOptions, [{ name: "Lavender", hex: "#bb99cc", image: "lavender-photo" }]);
+  assert.equal(product.gallery[0], "main-photo");
+});

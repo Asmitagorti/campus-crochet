@@ -2,6 +2,7 @@ import { adminDatabase, requireUser } from "@/lib/supabase-admin";
 import { loadProducts } from "@/lib/store-data";
 import { guard, errorResponse } from "@/lib/forms";
 import { readJsonBody } from "@/lib/request-body";
+import { cartColorsFor, parseCartColors } from "@/lib/cart-colors";
 
 export const runtime = "nodejs";
 
@@ -13,13 +14,17 @@ export async function GET(request: Request) {
       loadProducts(true),
     ]);
     if (error) throw error;
-    const byId = new Map(products.map((p) => [p.databaseId, p.id]));
+    const byId = new Map(products.map((p) => [p.databaseId, p]));
     const cart: Record<string, number> = {};
+    const cartColors: Record<string, string[]> = {};
     for (const item of Array.isArray(data?.items) ? data.items : []) {
-      const slug = byId.get(item.productId);
-      if (slug && Number.isInteger(item.quantity) && item.quantity > 0) cart[slug] = item.quantity;
+      const product = byId.get(item.productId);
+      if (product && Number.isInteger(item.quantity) && item.quantity > 0) {
+        cart[product.id] = item.quantity;
+        cartColors[product.id] = cartColorsFor(product, item.quantity, item.colors);
+      }
     }
-    return Response.json({ cart, liked: Array.isArray(data?.liked) ? data.liked : [] },
+    return Response.json({ cart, cartColors, liked: Array.isArray(data?.liked) ? data.liked : [] },
       { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return errorResponse(error, 401); }
 }
@@ -41,7 +46,8 @@ export async function POST(request: Request) {
       const quantity = Number(rawQuantity);
       if (!product?.databaseId || !Number.isInteger(quantity) || quantity < 1 || quantity > 20)
         throw Error("Please check your bag quantities.");
-      return { productId: product.databaseId, quantity, color: "Default" };
+      const colors = parseCartColors(product, quantity, body.cartColors?.[slug]);
+      return { productId: product.databaseId, quantity, color: "Default", colors };
     });
     const liked = [...new Set(body.liked as string[])].filter((id) => bySlug.has(id));
     const { error } = await adminDatabase().from("carts").upsert({

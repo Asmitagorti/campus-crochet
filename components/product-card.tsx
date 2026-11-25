@@ -46,15 +46,18 @@ export function ProductCard({
         {p.name}
       </Link>
       <p>{p.note}</p>
+      <span className="product-personalize-note">{p.colorOptions?.length ? "Choose a colour · Add gift details at checkout" : "Add gift details at checkout"}</span>
       <div className="card-price"><ProductPrice product={p} /></div>
       <span className="price-note">{availability(p)}</span>
-      <button
+      {p.colorOptions?.length && canOrder(p) ? <Link className="small-button" href={`/products/${p.id}`}>
+        Choose colour <Plus size={12} />
+      </Link> : <button
         disabled={!canOrder(p)}
         className="small-button"
         onClick={() => add(p.id)}
       >
         Add to bag <Plus size={12} />
-      </button>
+      </button>}
     </motion.article>
   );
 }

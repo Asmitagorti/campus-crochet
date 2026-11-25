@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { browserDatabase } from "@/lib/supabase-client";
 import { afterGoogleDestination, isSuccessfulGoogleCallback } from "@/lib/auth-redirect";
+import { checkedSession } from "@/lib/auth-session-state";
 
 type AccountUser = { uid: string; email: string | null; displayName: string | null };
 type AuthState = {
@@ -43,8 +44,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         const response = await fetch("/api/auth/session", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
         const data = await response.json();
         if (run === generation.current) {
+          const checked = checkedSession(accountUser(current), {
+            ok: response.ok, admin: data.admin, error: data.error,
+          });
+          setUser(checked.user);
+          setAdmin(checked.admin);
+          setError(checked.error);
           if (response.ok) {
-            setAdmin(data.admin === true);
             if (callbackSucceeded.current) {
               callbackSucceeded.current = false;
               const destination = sessionStorage.getItem("campus-after-google");
@@ -56,8 +62,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           else {
             callbackSucceeded.current = false;
             sessionStorage.removeItem("campus-after-google");
-            setUser(null);
-            setError(data.error || "Your account could not be loaded.");
           }
         }
       } catch {

@@ -11,7 +11,6 @@ import {
   Check,
   Leaf,
   HandHeart,
-  MapPin,
   ZoomIn,
   X,
 } from "lucide-react";
@@ -32,6 +31,8 @@ export default function ProductDetail({ product: p }: { product: Product }) {
     router = useRouter();
   const [quantity, setQuantity] = useState(1),
     [image, setImage] = useState(0),
+    [selectedColor, setSelectedColor] = useState(p.colorOptions?.[0]?.name || "As pictured"),
+    [colourImage, setColourImage] = useState<string | null>(p.colorOptions?.[0]?.image || null),
     [tab, setTab] = useState("The little details"),
     [zoom, setZoom] = useState(false);
   const max = maxQuantity(p);
@@ -67,8 +68,9 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               aria-label="Enlarge product photo"
             >
               <img
-                src={p.gallery[image]}
-                alt={`${p.name} — ${image === 0 ? "product view" : "original photograph"}`}
+                src={colourImage || p.gallery[image]}
+                alt={colourImage ? `${p.name} in ${p.colorOptions?.find((option) => option.image === colourImage)?.name || "selected colour"}`
+                  : `${p.name}, photo ${image + 1}`}
                 width={800}
                 height={900}
               />
@@ -83,12 +85,11 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               <button
                 key={src}
                 className={image === i ? "selected" : ""}
-                onClick={() => setImage(i)}
-                aria-label={`Show ${i === 0 ? "product view" : "original photo"}`}
+                onClick={() => { setImage(i); setColourImage(null); }}
+                aria-label={`Show ${p.name} photo ${i + 1}`}
                 aria-pressed={image === i}
               >
                 <img src={src} alt="" />
-                <span>{i === 0 ? "Product view" : "Original photo"}</span>
               </button>
             ))}
           </div>
@@ -116,20 +117,15 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             Made to order · Crocheted after you order
           </div>
           <p className="purchase-intro">{p.description}</p>
-          <div className="colour-info">
-            <strong>The palette</strong>
-            <div>
-              {p.colors.map((color) => (
-                <span key={color} style={{ background: color }} />
-              ))}
-            </div>
-            <small>
-              As pictured · For colour requests,{" "}
-              <Link href={`/contact?topic=custom&product=${p.id}`}>
-                say hello
-              </Link>
-            </small>
-          </div>
+          <div className="personalization-promise"><strong>Make it personal ♡</strong>
+            <p>Add the recipient’s name, an occasion and a complimentary handwritten message at checkout. Each piece can have its own gift details.</p></div>
+          {(p.colorOptions?.length || 0) > 0 ? <div className="product-colour-choices">
+            <strong>Choose your colour</strong><p>See each finished colour and pick yours before adding it to your bag.</p>
+            <div>{p.colorOptions!.map((option) => <button type="button" key={option.name}
+              className={selectedColor === option.name ? "selected" : ""} onClick={() => { setSelectedColor(option.name); setColourImage(option.image); }}
+              aria-label={`Choose ${p.name} in ${option.name}`} aria-pressed={selectedColor === option.name}>
+              <img src={option.image} alt="" /><span>{option.name}</span></button>)}</div>
+          </div> : <p className="product-fixed-colour">Colour as pictured · Add gift details at checkout.</p>}
           <div className="purchase-actions">
             <div className="quantity detail-quantity">
               <button
@@ -150,7 +146,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             </div>
             <button
               className="stitch-button"
-              onClick={() => add(p.id, Math.min(quantity, max))}
+              onClick={() => add(p.id, Math.min(quantity, max), selectedColor)}
             >
               <ShoppingBag size={17} /> Add to bag
             </button>
@@ -169,7 +165,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             className="buy-button"
             onClick={() =>
               router.push(
-                `/checkout?buy=${p.id}&quantity=${Math.min(quantity, max)}`,
+                `/checkout?buy=${p.id}&quantity=${Math.min(quantity, max)}&color=${encodeURIComponent(selectedColor)}`,
               )
             }
           >
@@ -178,9 +174,6 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           <div className="purchase-promises">
             <span>
               <HandHeart size={18} /> Made by hand
-            </span>
-            <span>
-              <MapPin size={18} /> Aditya Surampalem delivery
             </span>
             <span>
               <Check size={18} /> Secure Razorpay checkout
@@ -309,7 +302,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           >
             <X />
           </button>
-          <img src={p.gallery[image]} alt={p.name} />
+          <img src={colourImage || p.gallery[image]} alt={p.name} />
         </div>
       )}
     </main>

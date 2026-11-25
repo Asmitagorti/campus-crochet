@@ -1,4 +1,7 @@
-export type OrderItem = { id: string; databaseId: string; name: string; quantity: number; price: number };
+import { savedPersonalizations, type GiftPersonalization } from "./personalization";
+
+export type OrderItem = { id: string; databaseId: string; name: string; quantity: number; price: number;
+  personalizations: GiftPersonalization[] };
 export type OrderRow = {
   id: string;
   receipt: string;
@@ -39,6 +42,7 @@ export function mapOrderRow(row: Record<string, unknown>): OrderRow {
         name: String(item.product_name_at_purchase || product.name || "Handmade piece"),
         quantity: Number(item.quantity || 0),
         price: Number(item.price_at_purchase || 0),
+        personalizations: savedPersonalizations(customer, String(product.slug || "")),
       };
     }),
     amount: Math.round(Number(row.total_price || 0) * 100),

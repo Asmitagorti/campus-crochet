@@ -1,4 +1,6 @@
 "use client";
+import { personalizationSummary } from "./gift-personalization";
+import type { GiftPersonalization } from "@/lib/personalization";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "./auth-provider";
@@ -16,7 +18,7 @@ type AccountOrder = {
   fulfillment: string | null;
   receivedAt?: string | null;
   created_at: string;
-  items: { name: string; quantity: number; price: number }[];
+  items: { name: string; quantity: number; price: number; personalizations?: GiftPersonalization[] }[];
   customer?: { addressChoice: string | null; deliveryAddress: string | null; deliveryPin: string | null };
 };
 export default function Account() {
@@ -150,11 +152,13 @@ export default function Account() {
                       year: "numeric",
                     })}
                   </p>
-                  {o.items.map((i) => (
-                    <p key={i.name}>
-                      {i.name} × {i.quantity} · {money(i.price * i.quantity)}
-                    </p>
-                  ))}
+                  {o.items.map((i, itemIndex) => <div className="account-order-item" key={itemIndex}>
+                    <p>{i.name} × {i.quantity} · {money(i.price * i.quantity)}</p>
+                    {i.personalizations?.map((choice, choiceIndex) => personalizationSummary(choice).length > 0 && <small className="personalization-summary" key={choiceIndex}>
+                      {i.quantity > 1 && <b>Piece {choiceIndex + 1}</b>}
+                      {personalizationSummary(choice).map((line) => <span key={line}>{line}</span>)}
+                    </small>)}
+                  </div>)}
                   {o.customer?.addressChoice && <p>Deliver to: {o.customer.addressChoice}{o.customer.deliveryAddress ? ` · ${o.customer.deliveryAddress}` : ""}{o.customer.deliveryPin ? ` · ${o.customer.deliveryPin}` : ""}</p>}
                   <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery: {o.deliveryPaise ? money(o.deliveryPaise / 100) : "Free"}</p>
                   <strong>Total: {money(o.amount / 100)}</strong>

@@ -13,9 +13,12 @@ import {
 } from "lucide-react";
 import { useShop } from "./site-shell";
 import { useAuth } from "./auth-provider";
-import { money, maxQuantity } from "@/lib/catalog";
+import { money, maxQuantity, type Product } from "@/lib/catalog";
 import ProductPrice from "./product-price";
 import { indianStates } from "@/lib/indian-states";
+import GiftPersonalizationForm, { personalizationSummary } from "./gift-personalization";
+import { defaultPersonalization, type GiftPersonalization } from "@/lib/personalization";
+import { cartColorsFor, defaultCartColor } from "@/lib/cart-colors";
 type PaymentResult = {
   razorpay_order_id: string;
   razorpay_payment_id: string;
@@ -41,7 +44,7 @@ type Receipt = {
   deliveryChoice: string;
   deliveryAddress: string;
   deliveryPin: string;
-  items: { id: string; name: string; quantity: number; price: number }[];
+  items: { id: string; name: string; quantity: number; price: number; personalizations: GiftPersonalization[] }[];
   status: string;
 };
 type DeliveryQuote = { subtotalPaise: number; deliveryPaise: number; totalPaise: number };
@@ -56,7 +59,7 @@ type RazorpayOptions = {
   theme: { color: string };
   timeout: number;
   handler: (result: PaymentResult) => void;
-  modal: { ondismiss: () => void };
+  modal: { ondismiss: () => void; backdropclose: boolean };
 };
 declare global {
   interface Window {
@@ -73,10 +76,11 @@ export default function Checkout({
   testMode: boolean;
   nonce?: string;
 }) {
-  const { cart, refreshPreferences, ready, catalog } = useShop(),
+  const { cart, cartColors, refreshPreferences, ready, catalog } = useShop(),
     { user, login, token, error: authError } = useAuth(),
     params = useSearchParams(),
     buy = params.get("buy"),
+    directColor = params.get("color"),
     requested = Number(params.get("quantity") || 1);
   const direct = catalog.find((p) => p.id === buy);
   const items = direct
@@ -106,16 +110,39 @@ export default function Checkout({
     [quoteError, setQuoteError] = useState(""),
     [quoting, setQuoting] = useState(false),
     [busy, setBusy] = useState(false),
+    [paymentLocked, setPaymentLocked] = useState(false),
     [error, setError] = useState(""),
     [scriptReady, setScriptReady] = useState(false),
     [attempt, setAttempt] = useState<Attempt | null>(null),
     [receipt, setReceipt] = useState<Receipt | null>(null),
+    [personalizations, setPersonalizations] = useState<Record<string, GiftPersonalization[]>>({}),
     [receiptOwner, setReceiptOwner] = useState<string | null>(null);
   const activeAttempt = user && attempt?.accountId === user.uid ? attempt : null;
   const activeReceipt = user && receiptOwner === user.uid ? receipt : null;
   const itemSignature = JSON.stringify(items.map((item) => [item.id, item.quantity, item.price]));
   const quoteKey = JSON.stringify([deliveryPin, state, city.trim(), itemSignature]);
   const liveQuote = addressChoice === "Others" && deliveryQuote?.key === quoteKey ? deliveryQuote.value : null;
+  function chosenColor(product: Product, index: number) {
+    if (direct) return product.colorOptions?.find((option) => option.name === directColor)?.name || defaultCartColor(product);
+    return cartColorsFor(product, cart[product.id] || 0, cartColors[product.id])[index] || defaultCartColor(product);
+  }
+  function giftChoice(product: Product, index: number): GiftPersonalization {
+    return { ...defaultPersonalization(product), ...personalizations[product.id]?.[index],
+      color: chosenColor(product, index) };
+  }
+  useEffect(() => {
+    if (!paymentLocked) return;
+    const site = document.querySelector<HTMLElement>(".site-shell");
+    if (!site) return;
+    const wasInert = site.inert;
+    const previousOverflow = document.documentElement.style.overflow;
+    site.inert = true;
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      site.inert = wasInert;
+      document.documentElement.style.overflow = previousOverflow;
+    };
+  }, [paymentLocked]);
   useEffect(() => {
     setName(user?.displayName || "");
     setPhone("");
@@ -173,6 +200,7 @@ export default function Checkout({
     setAttempt(null);
     setReceipt(null);
     setReceiptOwner(null);
+    setPersonalizations({});
     if (!user) return;
     key.current = crypto.randomUUID();
     try {
@@ -230,6 +258,7 @@ export default function Checkout({
       );
     } finally {
       setBusy(false);
+      setPaymentLocked(false);
     }
   }
   async function cancel(value: Attempt) {
@@ -259,6 +288,7 @@ export default function Checkout({
       );
     } finally {
       setBusy(false);
+      setPaymentLocked(false);
     }
   }
   async function pay(e: React.FormEvent<HTMLFormElement>) {
@@ -280,6 +310,7 @@ export default function Checkout({
       return;
     }
     setBusy(true);
+    setPaymentLocked(true);
     setError("");
     const fields = Object.fromEntries(new FormData(e.currentTarget));
     try {
@@ -297,6 +328,8 @@ export default function Checkout({
             expectedAmount: addressChoice === "Others" ? liveQuote!.totalPaise : Math.round(total * 100),
             directBuy: !!buy,
             items: items.map((p) => ({ id: p.id, quantity: p.quantity })),
+            personalizations: Object.fromEntries(items.map((p) => [p.id,
+              Array.from({ length: p.quantity }, (_, index) => giftChoice(p, index))])),
           }),
         }),
         data = await response.json();
@@ -306,6 +339,7 @@ export default function Checkout({
       if (data.paid) {
         await readReceipt(value);
         setBusy(false);
+        setPaymentLocked(false);
         return;
       }
       const checkout = new window.Razorpay({
@@ -323,7 +357,7 @@ export default function Checkout({
         theme: { color: "#87502c" },
         timeout: 900,
         handler: (result) => void verify(value, result),
-        modal: { ondismiss: () => void cancel(value) },
+        modal: { backdropclose: false, ondismiss: () => void cancel(value) },
       });
       checkout.on("payment.failed", () =>
         setError(
@@ -339,6 +373,7 @@ export default function Checkout({
       );
       key.current = crypto.randomUUID();
       setBusy(false);
+      setPaymentLocked(false);
     }
   }
   if (activeReceipt)
@@ -368,8 +403,11 @@ export default function Checkout({
           <h2>{activeReceipt.receipt}</h2>
           {activeReceipt.items.map((i) => (
             <div className="receipt-item" key={i.id}>
-              <span>
-                {i.name} × {i.quantity}
+              <span>{i.name} × {i.quantity}
+                {i.personalizations?.map((choice, index) => personalizationSummary(choice).length > 0 && <small className="personalization-summary" key={index}>
+                  {i.quantity > 1 && <b>Piece {index + 1}</b>}
+                  {personalizationSummary(choice).map((line) => <span key={line}>{line}</span>)}
+                </small>)}
               </span>
               <strong>{money(i.price * i.quantity)}</strong>
             </div>
@@ -468,7 +506,7 @@ export default function Checkout({
         items.length > 0 && (
           <div className="checkout-layout">
             <section className="paper-form">
-              <h2>Contact and delivery details</h2>
+              <h2>Your order details</h2>
               {!user ? (
                 <div className="checkout-signin">
                   <LockKeyhole />
@@ -485,6 +523,18 @@ export default function Checkout({
                 </div>
               ) : (
                 <form onSubmit={pay}>
+                  <div className="checkout-personalization-intro"><span className="eyebrow">The personal touch</span>
+                    <h3>Make each piece yours</h3><p>Your shop colour is saved. Add a name, occasion or message for a complimentary handwritten card.</p></div>
+                  {items.flatMap((product) => Array.from({ length: product.quantity }, (_, index) => {
+                    const choice = giftChoice(product, index);
+                    return <GiftPersonalizationForm key={`${product.id}-${index}`} product={product} number={index + 1} quantity={product.quantity}
+                      value={choice} onChange={(next) => setPersonalizations((previous) => {
+                        const entries = Array.from({ length: product.quantity }, (_, i) => previous[product.id]?.[i] || giftChoice(product, i));
+                        entries[index] = next;
+                        return { ...previous, [product.id]: entries };
+                      })} />;
+                  }))}
+                  <h3 className="checkout-contact-heading">Contact and delivery</h3>
                   <p className="form-intro">Signed in as {user.email}. Your order confirmation will go to this address.</p>
                   <p className="quiet-note">Made to order · Free shipping · Dispatch in 5–7 working days after payment confirmation.</p>
                   <div className="field">
@@ -606,11 +656,16 @@ export default function Checkout({
               {items.map((p) => (
                 <div className="checkout-item" key={p.id}>
                   <Link href={`/products/${p.id}`}>
-                    <img src={p.gallery[0]} alt={p.name} />
+                    <img src={p.colorOptions?.find((option) => option.name === chosenColor(p, 0))?.image || p.gallery[0]} alt={p.name} />
                   </Link>
                   <div>
                     <Link href={`/products/${p.id}`}>{p.name}</Link>
                     <p>Quantity {p.quantity}</p>
+                    {!!p.colorOptions?.length && <small className="checkout-colour-summary">
+                      {Array.from({ length: p.quantity }, (_, index) => <span key={index}>
+                        {p.quantity > 1 ? `Piece ${index + 1}: ` : ""}{chosenColor(p, index)}
+                      </span>)}
+                    </small>}
                     {p.quantity > maxQuantity(p) && (
                       <span className="form-error">
                         Please update this quantity.

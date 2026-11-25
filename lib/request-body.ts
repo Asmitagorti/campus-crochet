@@ -26,8 +26,8 @@ export async function readLimitedBody(request: Request, limit: number, errorMess
   return body;
 }
 
-export async function readJsonBody(request: Request): Promise<Record<string, any>> {
-  const body = await readLimitedBody(request, 20000, "This message is too long.");
+export async function readJsonBody(request: Request, limit = 20000): Promise<Record<string, any>> {
+  const body = await readLimitedBody(request, limit, "This message is too long.");
   try {
     const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw Error();

@@ -1,4 +1,5 @@
 import { media } from "./media";
+import type { ColorOption } from "./personalization";
 export type Product = {
   databaseId?: string;
   active?: boolean;
@@ -14,6 +15,7 @@ export type Product = {
   description: string;
   details: [string, string][];
   colors: string[];
+  colorOptions?: ColorOption[];
   stock: number | null;
   packedWeightGrams?: number | null;
   madeToOrder: boolean;

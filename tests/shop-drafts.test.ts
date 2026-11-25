@@ -6,11 +6,13 @@ test("a saved draft product keeps its private catalogue details", () => {
   const result = draftProductFromRow({ draft_id: "sample-id", slug: "blue-bag", revision: 3,
     data: { name: "Blue bag", categories: ["Bags", "Gifts"], description: "Handmade bag",
       note: "A small gift", price: 550, stock: 2, active: true,
-      details: [], colors: [], gallery: ["first", "second"] } });
+      details: [], colors: [], gallery: ["first", "second"],
+      colorOptions: [{ name: "Blue", hex: "#123456", image: "blue-photo" }] } });
   assert.equal(result.databaseId, "sample-id");
   assert.equal(result.id, "blue-bag");
   assert.deepEqual(result.categories, ["Bags", "Gifts"]);
   assert.deepEqual(result.gallery, ["first", "second"]);
+  assert.deepEqual(result.colorOptions, [{ name: "Blue", hex: "#123456", image: "blue-photo" }]);
   assert.equal(result.revision, 3);
   assert.equal(result.stock, null);
   assert.equal(result.madeToOrder, true);

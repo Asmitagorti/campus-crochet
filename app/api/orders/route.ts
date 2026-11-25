@@ -12,6 +12,7 @@ import { readJsonBody } from "@/lib/request-body";
 import { requireShoppingMode } from "@/lib/site-mode";
 import { saveCheckoutDetails } from "@/lib/saved-checkout";
 import { launchReadiness } from "@/lib/launch-readiness";
+import { parseOrderPersonalizations } from "@/lib/personalization";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
@@ -21,12 +22,16 @@ export async function POST(request: Request) {
     if (!launchReadiness(process.env).ready)
       throw Error("Public checkout is not ready for real payments. Please contact the studio.");
     const user = await requireUser(request);
-    const body = await readJsonBody(request);
+    const body = await readJsonBody(request, 100000);
     if (body.website) throw Error("Unable to process request.");
     const key = text(request.headers.get("idempotency-key"), 80);
     if (!/^[\da-f-]{36}$/i.test(key)) throw Error("Please refresh checkout and try again.");
-    const customer = { ...parseCheckoutCustomer(body, user.email), directBuy: body.directBuy === true };
-    const items = resolveCheckoutItems(body.items, await loadProducts());
+    const products = await loadProducts();
+    const items = resolveCheckoutItems(body.items, products);
+    const personalizations = parseOrderPersonalizations(body.personalizations,
+      items.map((item) => ({ product: products.find((p) => p.databaseId === item.productId)!, quantity: item.quantity })));
+    const customer = { ...parseCheckoutCustomer(body, user.email), directBuy: body.directBuy === true,
+      personalizations };
     const quote = await quoteDelivery(items, customer.addressChoice === "Others" ? customer.deliveryPin : null);
     const amount = quote.totalPaise;
     if (!Number.isSafeInteger(body.expectedAmount) || body.expectedAmount !== amount)

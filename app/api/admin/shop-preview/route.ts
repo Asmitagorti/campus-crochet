@@ -5,6 +5,7 @@ import { draftPreviewProduct, previewCheckoutTotal } from "@/lib/shop-drafts";
 import { guard, errorResponse } from "@/lib/forms";
 import { readJsonBody } from "@/lib/request-body";
 import { adminDatabase } from "@/lib/supabase-admin";
+import { parseOrderPersonalizations } from "@/lib/personalization";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
   try {
     const admin = await requireAdminAccess(request);
     await guard(request, 30);
-    const body = await readJsonBody(request);
+    const body = await readJsonBody(request, 100000);
     if (!body.cart || typeof body.cart !== "object" || Array.isArray(body.cart))
       throw Error("Add an item to the preview bag.");
     const cart = body.cart as Record<string, unknown>;
@@ -30,8 +31,9 @@ export async function POST(request: Request) {
       if (!product || !Number.isInteger(quantity) || (quantity as number) < 1 ||
         (quantity as number) > 10)
         throw Error("Check the items in your preview bag.");
-      return { price: draftPreviewProduct(product, saleActive).price, quantity: quantity as number };
+      return { product, price: draftPreviewProduct(product, saleActive).price, quantity: quantity as number };
     });
+    parseOrderPersonalizations(body.personalizations, items);
     const customer = parseCheckoutCustomer(body, admin.email);
     const quote = previewCheckoutTotal(items, customer.addressChoice);
     return Response.json({ ...quote, rehearsal: true }, { headers: { "Cache-Control": "no-store" } });

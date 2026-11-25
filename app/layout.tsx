@@ -4,7 +4,7 @@ import SiteShell from "@/components/site-shell";
 import AnalyticsTracker from "@/components/analytics-tracker";
 import GoogleAnalytics from "@/components/google-analytics";
 import { googleAnalyticsMeasurementId } from "@/lib/google-analytics";
-import { loadDisplayMode } from "@/lib/site-mode";
+import { loadDisplayRuntime } from "@/lib/site-mode";
 import type { Metadata } from "next";
 import "@fontsource/caveat/500.css";
 import "@fontsource/caveat/600.css";
@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const initialMode = await loadDisplayMode();
+  const { mode: initialMode, saleEndsAt: initialSaleEndsAt } = await loadDisplayRuntime();
   const [initialProducts, initialSettings] = await Promise.all([
     loadProducts(),
     loadSettings(initialMode === "poll" ? "poll_settings" : "settings"),
@@ -38,6 +38,8 @@ export default async function RootLayout({
             initialProducts={initialProducts}
             initialSettings={initialSettings}
             initialMode={initialMode}
+            initialSaleEndsAt={initialSaleEndsAt}
+            initialNow={Date.now()}
           >
             {children}
           </SiteShell>

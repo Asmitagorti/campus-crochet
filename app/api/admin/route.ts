@@ -3,6 +3,7 @@ import { requireAdminAccess } from "@/lib/admin-access";
 import { loadDraftProducts, loadDraftSettings, loadSettings } from "@/lib/store-data";
 import { errorResponse } from "@/lib/forms";
 import { launchReadiness } from "@/lib/launch-readiness";
+import { savedPersonalizations } from "@/lib/personalization";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
     const db = adminDatabase();
     const [products, settings, orders, messages, journey, draftState, runtimeState, pollRows, pollSettingsRow] = await Promise.all([
       loadDraftProducts(), loadDraftSettings(),
-      allRows("orders", "order_id,receipt_number,total_price,subtotal_paise,postage_paise,delivery_paise,delivery_pin,payment_status,order_status,received_at,ordered_at,version,razorpay_payment_id,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(name))", "ordered_at"),
+      allRows("orders", "order_id,receipt_number,total_price,subtotal_paise,postage_paise,delivery_paise,delivery_pin,payment_status,order_status,received_at,ordered_at,version,razorpay_payment_id,customer_snapshot,delivery_choice,delivery_address,order_items(quantity,price_at_purchase,product_name_at_purchase,products(slug,name))", "ordered_at"),
       allRows("support_tickets", "id,name,email,subject,message,status,created_at", "created_at"),
       db.from("shop_journey_drafts").select("slug,data,published,revision").order("updated_at", { ascending: false }),
       db.from("shop_draft_state").select("dirty,revision,last_published_at").eq("id", true).single(),
@@ -73,8 +74,9 @@ export async function GET(request: Request) {
             deliveryPin: row.delivery_pin || customer.deliveryPin,
             addressLine1: customer.addressLine1, areaStreet: customer.areaStreet,
             city: customer.city, state: customer.state, landmark: customer.landmark },
-          items: ((row.order_items || []) as { quantity: number; price_at_purchase: number; product_name_at_purchase?: string; products: { name?: string } | null }[])
-            .map((item) => ({ name: item.product_name_at_purchase || item.products?.name || "Handmade piece", quantity: Number(item.quantity), price: Number(item.price_at_purchase) })),
+          items: ((row.order_items || []) as { quantity: number; price_at_purchase: number; product_name_at_purchase?: string; products: { slug?: string; name?: string } | null }[])
+            .map((item) => ({ name: item.product_name_at_purchase || item.products?.name || "Handmade piece", quantity: Number(item.quantity), price: Number(item.price_at_purchase),
+              personalizations: savedPersonalizations(customer, item.products?.slug || "") })),
           created_at: row.ordered_at,
         };
       }),

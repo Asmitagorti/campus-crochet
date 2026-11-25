@@ -7,18 +7,23 @@ import { journal, JournalEntry } from "./journal";
 import { draftProductFromRow, ProductDraftRow } from "./shop-drafts";
 
 export async function loadProducts(includeUnavailable = false): Promise<Product[]> {
-  let query = adminDatabase().from("products")
-    .select("product_id,slug,name,category,categories,short_description,full_description,price,discount_price,stock_quantity,packed_weight_grams,is_available,details,display_colors,revision,product_images(image_url,display_order)")
-    .not("slug", "is", null);
-  if (!includeUnavailable) query = query.eq("is_available", true);
-  const [{ data, error }, sale] = await Promise.all([
-    query.limit(1000),
+  const columns = "product_id,slug,name,category,categories,short_description,full_description,price,discount_price,stock_quantity,packed_weight_grams,is_available,details,display_colors,revision,product_images(image_url,display_order)";
+  const fetchProducts = (withColorOptions: boolean) => {
+    let query = adminDatabase().from("products")
+      .select(withColorOptions ? columns.replace("display_colors,revision", "display_colors,color_options,revision") : columns)
+      .not("slug", "is", null);
+    if (!includeUnavailable) query = query.eq("is_available", true);
+    return query.limit(1000);
+  };
+  let [result, sale] = await Promise.all([
+    fetchProducts(true),
     adminDatabase().from("site_runtime").select("sale_ends_at").eq("id", true).single(),
   ]);
-  if (error) throw error;
+  if (result.error && /color_options/i.test(result.error.message)) result = await fetchProducts(false);
+  if (result.error) throw result.error;
   if (sale.error) throw sale.error;
   const saleActive = !!sale.data.sale_ends_at && new Date(sale.data.sale_ends_at).getTime() > Date.now();
-  return (data || []).map((row) => mapStoreProduct(row as StoreProductRow, saleActive))
+  return (result.data || []).map((row) => mapStoreProduct(row as unknown as StoreProductRow, saleActive))
     .sort((a, b) => {
       const aIndex = catalogOrder.findIndex((item) => item.id === a.id);
       const bIndex = catalogOrder.findIndex((item) => item.id === b.id);

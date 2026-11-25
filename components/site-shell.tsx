@@ -23,13 +23,16 @@ import {
 import { products, getProduct, photo, money, maxQuantity } from "@/lib/catalog";
 import { defaultSettings, SiteSettings } from "@/lib/site-settings";
 import type { SiteMode } from "@/lib/site-mode";
+import { saleCountdown } from "@/lib/sale-countdown";
+import { cartColorsFor, defaultCartColor } from "@/lib/cart-colors";
 import { instagramHandle, instagramUrl } from "@/lib/social";
 import { Yarn } from "./design";
 import ProductPrice from "./product-price";
 type ShopState = {
   cart: Record<string, number>;
+  cartColors: Record<string, string[]>;
   liked: string[];
-  add: (id: string, quantity?: number) => void;
+  add: (id: string, quantity?: number, color?: string) => void;
   setQuantity: (id: string, n: number) => void;
   clearCart: () => void;
   refreshPreferences: () => Promise<void>;
@@ -59,21 +62,28 @@ export default function SiteShell({
   initialProducts,
   initialSettings,
   initialMode,
+  initialSaleEndsAt,
+  initialNow,
 }: {
   children: React.ReactNode;
   initialProducts: typeof products;
   initialSettings: SiteSettings;
   initialMode: SiteMode;
+  initialSaleEndsAt: string | null;
+  initialNow: number;
 }) {
   const { user, ready: authReady, logout, token } = useAuth();
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [preferencesOwner, setPreferencesOwner] = useState<string | null>(null);
   const [settings, setSettings] = useState(initialSettings);
   const [mode, setMode] = useState<SiteMode>(initialMode);
+  const [saleEndsAt, setSaleEndsAt] = useState(initialSaleEndsAt);
+  const [clockNow, setClockNow] = useState(initialNow);
   const [catalog, setCatalog] = useState(initialProducts);
   const pathname = usePathname(),
     router = useRouter();
   const [cart, setCart] = useState<Record<string, number>>({}),
+    [cartColors, setCartColors] = useState<Record<string, string[]>>({}),
     [liked, setLiked] = useState<string[]>([]),
     [ready, setReady] = useState(false),
     [dark, setDark] = useState(false),
@@ -81,10 +91,12 @@ export default function SiteShell({
     [bag, setBag] = useState(false),
     [notice, setNotice] = useState("");
   const drawer = useRef<HTMLElement>(null);
+  const refreshedSaleEnd = useRef<string | null>(null);
   const activeUserUid = useRef<string | null>(null);
   activeUserUid.current = user?.uid || null;
   const owned = !!user && preferencesOwner === user.uid;
   const visibleCart = owned ? cart : {};
+  const visibleCartColors = owned ? cartColors : {};
   const visibleLiked = owned ? liked : [];
   async function refreshPreferences() {
     if (!user) return;
@@ -97,12 +109,14 @@ export default function SiteShell({
     if (activeUserUid.current !== uid) return;
     setLiked(Array.isArray(data.liked) ? data.liked : []);
     setCart(data.cart && typeof data.cart === "object" ? data.cart : {});
+    setCartColors(data.cartColors && typeof data.cartColors === "object" ? data.cartColors : {});
     setPreferencesOwner(uid);
   }
   useEffect(() => {
     setPreferencesReady(false);
     setPreferencesOwner(null);
     setCart({});
+    setCartColors({});
     setLiked([]);
     setReady(false);
     setBag(false);
@@ -121,6 +135,7 @@ export default function SiteShell({
         if (active && activeUserUid.current === user.uid) {
           setLiked(Array.isArray(d.liked) ? d.liked : []);
           setCart(d.cart && typeof d.cart === "object" ? d.cart : {});
+          setCartColors(d.cartColors && typeof d.cartColors === "object" ? d.cartColors : {});
           setPreferencesOwner(user.uid);
           setPreferencesReady(true);
           setReady(true);
@@ -145,13 +160,26 @@ export default function SiteShell({
               Authorization: `Bearer ${t}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ liked, cart }),
+            body: JSON.stringify({ liked, cart, cartColors }),
           });
         })
         .catch(() => {});
     }, 800);
     return () => clearTimeout(timer);
-  }, [liked, cart, user?.uid, preferencesReady, preferencesOwner, token]);
+  }, [liked, cart, cartColors, user?.uid, preferencesReady, preferencesOwner, token]);
+  useEffect(() => {
+    if (!user || !ready || !owned) return;
+    const pending = sessionStorage.getItem("campus-pending-bag");
+    if (!pending) return;
+    sessionStorage.removeItem("campus-pending-bag");
+    try {
+      const choice = JSON.parse(pending) as { id?: unknown; quantity?: unknown; color?: unknown };
+      if (typeof choice.id !== "string" || !Number.isInteger(choice.quantity) ||
+        Number(choice.quantity) < 1 || Number(choice.quantity) > 10) return;
+      add(choice.id, Number(choice.quantity), typeof choice.color === "string" ? choice.color : undefined);
+      setBag(true);
+    } catch { /* A stale browser choice should not block sign-in. */ }
+  }, [user?.uid, ready, owned]);
   useEffect(() => {
     try {
       localStorage.removeItem("campus-bag");
@@ -163,6 +191,20 @@ export default function SiteShell({
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("campus-theme", dark ? "dark" : "light");
   }, [dark]);
+  useEffect(() => {
+    setClockNow(Date.now());
+    const timer = setInterval(() => setClockNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!saleEndsAt || saleCountdown(saleEndsAt, clockNow) ||
+      refreshedSaleEnd.current === saleEndsAt) return;
+    refreshedSaleEnd.current = saleEndsAt;
+    fetch("/api/inventory", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (data?.products) setCatalog(data.products); })
+      .catch(() => {});
+  }, [saleEndsAt, clockNow]);
   useEffect(() => {
     const changed = (event: Event) => {
       const next = (event as CustomEvent).detail;
@@ -195,7 +237,11 @@ export default function SiteShell({
         .catch(() => {});
       fetch("/api/mode", { cache: "no-store" })
         .then((r) => r.ok ? r.json() : null)
-        .then((data) => { if (active && (data?.mode === "shop" || data?.mode === "poll")) setMode(data.mode); })
+        .then((data) => {
+          if (!active || (data?.mode !== "shop" && data?.mode !== "poll")) return;
+          setMode(data.mode);
+          setSaleEndsAt(typeof data.saleEndsAt === "string" ? data.saleEndsAt : null);
+        })
         .catch(() => {});
     };
     sync();
@@ -263,26 +309,53 @@ export default function SiteShell({
       else next[id] = Math.min(max, Math.floor(n));
       return next;
     });
+    setCartColors((current) => {
+      const next = { ...current };
+      if (n <= 0) delete next[id];
+      else {
+        const existing = cartColorsFor(p, Math.min(max, visibleCart[id] || 0), current[id]);
+        next[id] = Array.from({ length: Math.min(max, Math.floor(n)) }, (_, index) =>
+          existing[index] || existing.at(-1) || defaultCartColor(p));
+      }
+      return next;
+    });
   }
-  function add(id: string, n = 1) {
-    if (!user) { router.push("/account"); return; }
+  function add(id: string, n = 1, color?: string) {
+    if (!user) {
+      sessionStorage.setItem("campus-pending-bag", JSON.stringify({ id, quantity: n, color }));
+      router.push("/account");
+      return;
+    }
     if (!ready || !owned) { setNotice("Your saved bag is still loading. Please try again shortly."); return; }
     const p = catalog.find((p) => p.id === id);
     if (!p) return;
     const max = maxQuantity(p);
-    setCart((c) => ({ ...c, [id]: Math.min(max, (c[id] || 0) + n) }));
+    const selectedColor = p.colorOptions?.find((option) => option.name === color)?.name || defaultCartColor(p);
+    const previousCount = visibleCart[id] || 0;
+    const nextCount = Math.min(max, previousCount + n);
+    setCart((c) => ({ ...c, [id]: nextCount }));
+    setCartColors((current) => ({ ...current,
+      [id]: [...cartColorsFor(p, previousCount, current[id]),
+        ...Array.from({ length: nextCount - previousCount }, () => selectedColor)] }));
     setNotice("A little happiness added to your bag ♡");
   }
   const count = catalog.reduce((sum, p) => sum + (visibleCart[p.id] || 0), 0),
     total = catalog.reduce((sum, p) => sum + (visibleCart[p.id] || 0) * p.price, 0);
+  const remaining = saleCountdown(saleEndsAt, clockNow);
+  const showSale = !!saleEndsAt && catalog.some((product) => product.regularPrice != null) &&
+    remaining !== null;
+  const announcementText = showSale
+    ? "Opening month offer ✦ Special prices on selected pieces ✦ Free shipping ✦ Handwritten gift card available ✦ Made to order ✦"
+    : "Free shipping ✦ Handwritten gift card available ✦ Made to order ✦ Dispatch in 5–7 working days ✦";
   return (
     <ShopContext.Provider
       value={{
         cart: visibleCart,
+        cartColors: visibleCartColors,
         liked: visibleLiked,
         add,
         setQuantity,
-        clearCart: () => setCart({}),
+        clearCart: () => { setCart({}); setCartColors({}); },
         refreshPreferences,
         toggleLike: (id) => {
           if (!user) { router.push("/account"); return; }
@@ -302,17 +375,18 @@ export default function SiteShell({
           <a href="#main-content" className="skip-link">
             Skip to content
           </a>
-          {mode === "shop" ? <div className="announcement announcement-running" aria-label={catalog.some((product) => product.regularPrice != null)
-            ? "Opening month offer. Special prices on selected pieces. Free shipping on every order."
-            : "Free shipping on every order. Each piece is made to order."}>
-            <div className="announcement-track">
-              <span>{catalog.some((product) => product.regularPrice != null)
-                ? "Opening month offer ✦ Special prices on selected pieces ✦ Free shipping on every order ✦ Made to order ✦"
-                : "Free shipping on every order ✦ Made to order ✦ Dispatch in 5–7 working days ✦"}</span>
-              <span aria-hidden="true">{catalog.some((product) => product.regularPrice != null)
-                ? "Opening month offer ✦ Special prices on selected pieces ✦ Free shipping on every order ✦ Made to order ✦"
-                : "Free shipping on every order ✦ Made to order ✦ Dispatch in 5–7 working days ✦"}</span>
+          {mode === "shop" ? <div className="announcement announcement-running">
+            <div className="announcement-message">
+              <div className="announcement-track">
+                <span>{announcementText}</span>
+                <span aria-hidden="true">{announcementText}</span>
+              </div>
             </div>
+            {showSale && <div className="announcement-countdown" aria-label="Opening sale time remaining">
+              <span>Sale ends in</span>
+              <time dateTime={saleEndsAt}>{remaining &&
+                `${remaining.days}d ${String(remaining.hours).padStart(2, "0")}h ${String(remaining.minutes).padStart(2, "0")}m ${String(remaining.seconds).padStart(2, "0")}s`}</time>
+            </div>}
           </div> : <div className="announcement">A little yarn. A lot of love. <Heart size={11} /> {settings.announcement}</div>}
           <header>
             <Link className="brand" href="/" aria-label="Campus-Crochet home">
@@ -502,7 +576,7 @@ export default function SiteShell({
                               href={`/products/${p.id}`}
                               onClick={() => setBag(false)}
                             >
-                              <img src={p.gallery[0]} alt={p.name} />
+                              <img src={p.colorOptions?.find((option) => option.name === visibleCartColors[p.id]?.[0])?.image || p.gallery[0]} alt={p.name} />
                             </Link>
                             <div>
                               <Link
@@ -512,6 +586,10 @@ export default function SiteShell({
                                 <h3>{p.name}</h3>
                               </Link>
                               <p><ProductPrice product={p} showSavings={false} /></p>
+                              {!!p.colorOptions?.length && <small className="cart-colour-summary">
+                                {cartColorsFor(p, visibleCart[p.id], visibleCartColors[p.id]).map((color, index) =>
+                                  <span key={index}>{visibleCart[p.id] > 1 ? `Piece ${index + 1}: ` : ""}{color}</span>)}
+                              </small>}
                               <div className="quantity">
                                 <button
                                   aria-label={`Remove one ${p.name}`}

@@ -13,6 +13,8 @@ import StudioShopPreview from "./studio-shop-preview";
 import StudioEmails from "./studio-emails";
 import StudioOrderFulfillment from "./studio-order-fulfillment";
 import StudioOrderMessages from "./studio-order-messages";
+import { personalizationSummary } from "./gift-personalization";
+import type { GiftPersonalization } from "@/lib/personalization";
 import {
   Plus,
   Upload,
@@ -59,7 +61,7 @@ type StudioOrder = {
     pickup?: string;
     note?: string;
   };
-  items: { name: string; quantity: number; price: number }[];
+  items: { name: string; quantity: number; price: number; personalizations?: GiftPersonalization[] }[];
   paymentId?: string | null;
   created_at: string;
 };
@@ -102,6 +104,7 @@ const blank: AdminProduct = {
   description: "",
   details: [["Includes", "One handmade crochet piece"]],
   colors: ["#e9b7cc"],
+  colorOptions: [],
   gallery: [],
   madeToOrder: true,
   active: false,
@@ -551,21 +554,31 @@ export default function Studio() {
                 }
               />
             </div>
-            <div className="field">
-              <label htmlFor="colors">
-                Palette (comma-separated hex colours)
-              </label>
-              <input
-                id="colors"
-                value={editing.colors.join(", ")}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    colors: e.target.value.split(",").map((s) => s.trim()),
-                  })
-                }
-              />
-            </div>
+            <fieldset className="studio-colour-options">
+              <legend>Colours customers can choose (optional)</legend>
+              <p className="quiet-note">Leave this empty for fixed designs like the bunny, tulips and sunflower bag. For the octopus and coasters, make the pictured colour first: it is selected by default. Upload a photo of the finished item in every colour.</p>
+              {(editing.colorOptions || []).map((option, index) => <div className="studio-colour-option" key={index}>
+                <div className="studio-colour-photo">{option.image ? <img src={option.image} alt={`${option.name || "Colour"} sample`} /> : <span>Photo needed</span>}</div>
+                <div className="field"><label htmlFor={`colour-name-${index}`}>Colour name {index === 0 ? "· default" : ""}</label>
+                  <input id={`colour-name-${index}`} value={option.name} maxLength={40} required
+                    onChange={(event) => setEditing({ ...editing, colorOptions: editing.colorOptions!.map((entry, i) => i === index ? { ...entry, name: event.target.value } : entry) })} /></div>
+                <div className="field"><label htmlFor={`colour-hex-${index}`}>Swatch</label>
+                  <input id={`colour-hex-${index}`} type="color" value={option.hex}
+                    onChange={(event) => setEditing({ ...editing, colorOptions: editing.colorOptions!.map((entry, i) => i === index ? { ...entry, hex: event.target.value } : entry) })} /></div>
+                <label className="outline-button studio-colour-upload">Upload this colour’s photo
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy}
+                    onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file, (url) =>
+                      setEditing((value) => value ? { ...value, colorOptions: value.colorOptions!.map((entry, i) => i === index ? { ...entry, image: url } : entry) } : value)); event.target.value = ""; }} /></label>
+                {index === 0 && editing.gallery[0] && <button type="button" className="text-link" onClick={() => setEditing({ ...editing,
+                  colorOptions: editing.colorOptions!.map((entry, i) => i === 0 ? { ...entry, image: editing.gallery[0] } : entry) })}>Use main product photo</button>}
+                <button type="button" className="text-link" disabled={busy || index === 0} onClick={() => { const next = [...editing.colorOptions!]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; setEditing({ ...editing, colorOptions: next }); }}>Move up</button>
+                <button type="button" className="text-link" disabled={busy || index === editing.colorOptions!.length - 1} onClick={() => { const next = [...editing.colorOptions!]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; setEditing({ ...editing, colorOptions: next }); }}>Move down</button>
+                <button type="button" className="text-link" disabled={busy} onClick={() => setEditing({ ...editing,
+                  colorOptions: editing.colorOptions!.filter((_, i) => i !== index) })}>Remove colour</button>
+              </div>)}
+              <button type="button" className="outline-button" disabled={busy || (editing.colorOptions?.length || 0) >= 12}
+                onClick={() => setEditing({ ...editing, colorOptions: [...(editing.colorOptions || []), { name: "", hex: "#c9add7", image: "" }] })}>Add a colour choice</button>
+            </fieldset>
             <fieldset className="spec-editor">
               <legend>Specifications</legend>
               {editing.details.map(([k, v], i) => (
@@ -769,7 +782,13 @@ export default function Studio() {
                 {o.customer.city && <p>Town / city: {o.customer.city}</p>}
                 {o.customer.state && <p>State: {o.customer.state}</p>}
                 {o.customer.landmark && <p>Landmark: {o.customer.landmark}</p>}
-                {o.items.map((i, index) => <p key={index}>{i.name} × {i.quantity} · {money(i.price * i.quantity)}</p>)}
+                {o.items.map((i, index) => <div className="studio-order-item" key={index}>
+                  <strong>{i.name} × {i.quantity} · {money(i.price * i.quantity)}</strong>
+                  {i.personalizations?.map((choice, choiceIndex) => personalizationSummary(choice).length > 0 && <div className="personalization-summary" key={choiceIndex}>
+                    {i.quantity > 1 && <b>Piece {choiceIndex + 1}</b>}
+                    {personalizationSummary(choice).map((line) => <span key={line}>{line}</span>)}
+                  </div>)}
+                </div>)}
                 <p>Subtotal: {money(o.subtotalPaise / 100)} · Delivery charge: {money(o.deliveryPaise / 100)} · Paid total: {money(o.amount / 100)}</p>
                 {o.paymentId && <p>Razorpay payment: {o.paymentId}</p>}
               </details>

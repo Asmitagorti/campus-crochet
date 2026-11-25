@@ -35,3 +35,13 @@ test("uses the item name saved at purchase even after a product is renamed", () 
       product_name_at_purchase: "Original bunny", products: { slug: "bunny", name: "Renamed bunny" } }] });
   assert.equal(order.items[0].name, "Original bunny");
 });
+
+test("keeps each saved gift instruction with its order item", () => {
+  const note = { color: "Pink", recipientName: "Ananya", occasion: "Birthday",
+    message: "With love", hidePrice: true };
+  const order = mapOrderRow({ order_id: "uuid", total_price: 180,
+    customer_snapshot: { personalizations: { octopus: [note] } },
+    order_items: [{ product_id: "p1", quantity: 1, price_at_purchase: 180,
+      products: { slug: "octopus", name: "Little Octopus" } }] });
+  assert.deepEqual(order.items[0].personalizations, [note]);
+});
