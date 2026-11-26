@@ -2,6 +2,13 @@ import { getDetails } from "@devzoy/indian-pincode";
 import { indianStates } from "./indian-states";
 import postalPlaces from "./postal-places.json";
 
+// India Post identifies this Bidhannagar office as Kolkata 700064, while the
+// bundled PIN directory lists only its post offices and district.
+// https://www.westbengalpost.gov.in/docs/kypm/BNCCblock.pdf
+const verifiedCityAliases: Record<string, string[]> = {
+  "700064": ["Kolkata", "Bidhannagar"],
+};
+
 function normalizePlace(value: string): string {
   return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
     .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim()
@@ -32,8 +39,8 @@ export function validateDestination(pin: string, state: string, city: string): v
   if (city.trim().length > 80 || town.length < 2) throw Error("Please enter a valid town or city.");
   // Bundled place names avoid a runtime file read inside Vercel functions.
   // A PIN can have offices in more than one state, so use only the selected state.
-  const places = (postalPlaces as Record<string, Record<string, string[]>>)[pin]?.[state]
-    ?? details.districts;
+  const places = [...((postalPlaces as Record<string, Record<string, string[]>>)[pin]?.[state]
+    ?? details.districts), ...(verifiedCityAliases[pin] ?? [])];
   const matchesDelhi = state === "DELHI" && (town === "DELHI" || town === "NEW DELHI");
   if (!matchesDelhi && !places.map(normalizePlace).some((place) => matchesPlace(place, town)))
     throw Error("The delivery PIN does not match the town or city entered. Check the PIN and town name.");

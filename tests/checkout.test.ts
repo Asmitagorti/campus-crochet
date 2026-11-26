@@ -54,3 +54,11 @@ test("home delivery PIN must match the entered town or city", () => {
   assert.equal(parseCheckoutCustomer({ ...home, city: "Delhi", state: "DELHI", deliveryPin: "110025" }, "asha@gmail.com").city, "Delhi");
   assert.throws(() => parseCheckoutCustomer({ ...home, city: "Budaun", state: "DELHI", deliveryPin: "110025" }, "asha@gmail.com"), /town|city/i);
 });
+
+test("Kolkata is accepted for the verified Bidhannagar 700064 delivery PIN", () => {
+  const address = { ...home, city: "Kolkata", state: "WEST BENGAL", deliveryPin: "700064" };
+  assert.equal(parseCheckoutCustomer(address, "asha@gmail.com").deliveryPin, "700064");
+  assert.equal(parseCheckoutCustomer({ ...address, city: "Bidhannagar" }, "asha@gmail.com").city, "Bidhannagar");
+  assert.throws(() => parseCheckoutCustomer({ ...address, city: "Mumbai" }, "asha@gmail.com"), /town|city/i);
+  assert.throws(() => parseCheckoutCustomer({ ...address, state: "MAHARASHTRA" }, "asha@gmail.com"), /state/i);
+});
