@@ -27,6 +27,7 @@ import { ProductCard } from "./product-card";
 import ProductPrice from "./product-price";
 import { Title } from "./design";
 import { productGallery } from "@/lib/personalization";
+import { separateMeasurements } from "@/lib/product-details";
 export default function ProductDetail({ product: p }: { product: Product }) {
   const { add, liked, toggleLike, catalog: products } = useShop(),
     router = useRouter();
@@ -37,6 +38,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
     [zoom, setZoom] = useState(false);
   const max = maxQuantity(p);
   const gallery = productGallery(p, selectedColor);
+  const { measurements, specifications } = separateMeasurements(p.details);
   const related = products
     .filter((x) => x.id !== p.id)
     .sort(
@@ -117,15 +119,15 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             Made to order · Crocheted after you order
           </div>
           <p className="purchase-intro">{p.description}</p>
-          <div className="personalization-promise"><strong>Make it personal ♡</strong>
-            <p>Add the recipient’s name, an occasion and a complimentary handwritten message at checkout. Each piece can have its own gift details.</p></div>
+          {measurements.length > 0 && <div className="product-measurements"><strong>Measurements</strong>
+            <span>{measurements.join(" · ")}</span></div>}
           {(p.colorOptions?.length || 0) > 0 ? <div className="product-colour-choices">
             <strong>Choose your colour</strong><p>See each finished colour and pick yours before adding it to your bag.</p>
             <div>{p.colorOptions!.map((option) => <button type="button" key={option.name}
               className={selectedColor === option.name ? "selected" : ""} onClick={() => { setSelectedColor(option.name); setImage(0); }}
               aria-label={`Choose ${p.name} in ${option.name}`} aria-pressed={selectedColor === option.name}>
               <img src={option.image} alt="" /><span>{option.name}</span></button>)}</div>
-          </div> : <p className="product-fixed-colour">Colour as pictured · Add gift details at checkout.</p>}
+          </div> : <p className="product-fixed-colour">Colour as pictured.</p>}
           <div className="purchase-actions">
             <div className="quantity detail-quantity">
               <button
@@ -240,12 +242,8 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           ) : tab === "Specifications" ? (
             <dl className="spec-list">
               {[
-                ...p.details,
+                ...specifications,
                 ["Construction", "Hand crocheted"],
-                [
-                  "Measurements",
-                  "Contact us for exact measurements before purchasing",
-                ],
                 ["Availability", availability(p)],
                 ["Delivery", "Free shipping; made to order, dispatched in 5–7 working days"],
               ].map(([key, value]) => (

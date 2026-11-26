@@ -2935,16 +2935,19 @@ input[type="checkbox"] {
   font-size: .72rem;
   font-weight: 800;
 }
-.personalization-promise {
+.product-measurements {
   margin: 20px 0;
-  padding: 15px 17px;
+  padding: 12px 16px;
   border: 1px solid var(--commerce-border);
-  border-left: 4px solid var(--commerce-action);
   border-radius: 9px;
   background: var(--commerce-surface);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  align-items: baseline;
 }
-.personalization-promise strong { color: var(--commerce-ink); font-size: .95rem; }
-.personalization-promise p,
+.product-measurements strong { color: var(--commerce-ink); font-size: .84rem; }
+.product-measurements span { color: var(--commerce-muted); font-size: .84rem; line-height: 1.5; }
 .product-colour-choices p,
 .product-fixed-colour { color: var(--commerce-muted); font-size: .8rem; line-height: 1.55; }
 .product-colour-choices { margin: 20px 0; }

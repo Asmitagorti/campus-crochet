@@ -636,6 +636,7 @@ export default function Studio() {
             </fieldset>
             <fieldset className="spec-editor">
               <legend>Specifications</legend>
+              <p className="quiet-note">Add a row labelled “Measurements” to show the size beside the price and order options on the item page.</p>
               {editing.details.map(([k, v], i) => (
                 <div key={i}>
                   <input

@@ -112,6 +112,7 @@ export default function Checkout({
     [busy, setBusy] = useState(false),
     [paymentLocked, setPaymentLocked] = useState(false),
     [error, setError] = useState(""),
+    [paymentNotice, setPaymentNotice] = useState(""),
     [scriptReady, setScriptReady] = useState(false),
     [attempt, setAttempt] = useState<Attempt | null>(null),
     [receipt, setReceipt] = useState<Receipt | null>(null),
@@ -194,8 +195,12 @@ export default function Checkout({
     return () => { clearTimeout(timer); controller.abort(); };
   }, [addressChoice, deliveryPin, state, city, itemSignature, quoteKey, total, user?.uid, token]);
   const key = useRef("");
+  const dismissCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveUserUid = useRef<string | null>(null);
   liveUserUid.current = user?.uid || null;
+  useEffect(() => () => {
+    if (dismissCheckTimer.current) clearTimeout(dismissCheckTimer.current);
+  }, [user?.uid]);
   useEffect(() => {
     setAttempt(null);
     setReceipt(null);
@@ -238,7 +243,9 @@ export default function Checkout({
     return false;
   }
   async function verify(value: Attempt, result: PaymentResult) {
+    if (dismissCheckTimer.current) clearTimeout(dismissCheckTimer.current);
     setBusy(true);
+    setPaymentNotice("");
     const recovery = { ...value, payment: result };
     remember(recovery);
     try {
@@ -262,31 +269,78 @@ export default function Checkout({
     }
   }
   async function cancel(value: Attempt) {
+    setPaymentLocked(false);
     setBusy(true);
     try {
       const response = await fetch("/api/payments/cancel", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
           body: JSON.stringify({ id: value.id, token: value.token }),
+          signal: AbortSignal.timeout(15000),
         }),
         data = await response.json();
       if (!response.ok) throw Error(data.error);
       if (data.status === "paid") await readReceipt(value);
       else if (data.status === "cancelled") {
+        if (dismissCheckTimer.current) clearTimeout(dismissCheckTimer.current);
         remember(null);
         key.current = crypto.randomUUID();
-        setError("Payment was cancelled. Your bag is safe; you can try again.");
-      } else
-        setError(
-          "Your payment is still processing. Please check its status before trying again.",
-        );
+        setError("");
+        setPaymentNotice("Payment window closed. Your bag is safe; you can try again.");
+      } else {
+        setError("");
+        setPaymentNotice("No completed payment was found yet. You can continue this payment now. To cancel it, check again in about two minutes so any payment in progress can be detected safely.");
+      }
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "We could not check this attempt. Please try again.",
+        e instanceof Error && e.name !== "TimeoutError" && e.name !== "AbortError"
+          ? e.message : "The payment check took too long. You can retry it; your bag is safe.",
       );
     } finally {
+      setBusy(false);
+    }
+  }
+  function dismissPayment(value: Attempt) {
+    setPaymentLocked(false);
+    setBusy(false);
+    setError("");
+    setPaymentNotice("Payment window closed. You can continue the same payment now. We will check whether it can be cancelled after about two minutes.");
+    if (dismissCheckTimer.current) clearTimeout(dismissCheckTimer.current);
+    dismissCheckTimer.current = setTimeout(() => void cancel(value), 2 * 60 * 1000);
+  }
+  function openPayment(value: Attempt) {
+    if (dismissCheckTimer.current) clearTimeout(dismissCheckTimer.current);
+    if (!window.Razorpay) {
+      setError("Secure checkout is still loading. Please try again in a moment.");
+      setBusy(false);
+      setPaymentLocked(false);
+      return;
+    }
+    setBusy(true);
+    setPaymentLocked(true);
+    setError("");
+    setPaymentNotice("");
+    try {
+      let completed = false;
+      const checkout = new window.Razorpay({
+        key: value.key,
+        amount: value.amount,
+        currency: "INR",
+        order_id: value.orderId,
+        name: "Campus-Crochet",
+        description: `Your handmade little things · ${value.id}`,
+        prefill: { name, email: user?.email || "", contact: phone },
+        theme: { color: "#87502c" },
+        timeout: 900,
+        handler: (result) => { completed = true; void verify(value, result); },
+        modal: { backdropclose: false, ondismiss: () => { if (!completed) dismissPayment(value); } },
+      });
+      checkout.on("payment.failed", () =>
+        setError("That payment did not go through. You can retry in Razorpay or close it and try again."),
+      );
+      checkout.open();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Your payment could not start. Please try again.");
       setBusy(false);
       setPaymentLocked(false);
     }
@@ -312,6 +366,7 @@ export default function Checkout({
     setBusy(true);
     setPaymentLocked(true);
     setError("");
+    setPaymentNotice("");
     const fields = Object.fromEntries(new FormData(e.currentTarget));
     try {
       const response = await fetch("/api/orders", {
@@ -342,29 +397,7 @@ export default function Checkout({
         setPaymentLocked(false);
         return;
       }
-      const checkout = new window.Razorpay({
-        key: value.key,
-        amount: value.amount,
-        currency: "INR",
-        order_id: value.orderId,
-        name: "Campus-Crochet",
-        description: `Your handmade little things · ${value.id}`,
-        prefill: {
-          name: String(fields.name),
-          email: user?.email || "",
-          contact: String(fields.phone),
-        },
-        theme: { color: "#87502c" },
-        timeout: 900,
-        handler: (result) => void verify(value, result),
-        modal: { backdropclose: false, ondismiss: () => void cancel(value) },
-      });
-      checkout.on("payment.failed", () =>
-        setError(
-          "That payment did not go through. You can retry in Razorpay or close it and try again.",
-        ),
-      );
-      checkout.open();
+      openPayment(value);
     } catch (e) {
       setError(
         e instanceof Error
@@ -465,11 +498,12 @@ export default function Checkout({
           {error}
         </p>
       )}
+      {paymentNotice && <p className="form-success" role="status">{paymentNotice}</p>}
       {activeAttempt && (
         <section className="payment-recovery paper-form">
-          <h2>A little payment to finish</h2>
+          <h2>Your payment attempt</h2>
           <p>
-            Reference: {activeAttempt.id}. Check this payment before starting another.
+            Reference: {activeAttempt.id}. Continue this payment, or check its status before starting another.
           </p>
           {activeAttempt.payment ? (
             <button
@@ -480,13 +514,16 @@ export default function Checkout({
               Retry payment verification
             </button>
           ) : (
-            <button
-              className="stitch-button"
-              disabled={busy}
-              onClick={() => void cancel(activeAttempt)}
-            >
-              Check status / cancel attempt
-            </button>
+            <>
+              <button className="stitch-button" disabled={busy}
+                onClick={() => openPayment(activeAttempt)}>
+                Continue this payment
+              </button>
+              <button className="outline-button" disabled={busy}
+                onClick={() => void cancel(activeAttempt)}>
+                Check status / cancel attempt
+              </button>
+            </>
           )}
           <a href="mailto:support@campus-crochet.tech" className="text-link">Need a hand? Email support</a>
         </section>
